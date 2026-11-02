@@ -1,0 +1,19 @@
+{
+  "name": "Ping — Compartilhamento de Tela P2P",
+  "short_name": "Ping",
+  "description": "Compartilhamento de tela P2P no navegador via WebRTC, com alta qualidade e baixa latência.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0d12",
+  "theme_color": "#0b0d12",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

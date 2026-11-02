@@ -1,0 +1,977 @@
+import { Peer, type DataConnection, type MediaConnection } from "peerjs";
+import { CONNECT_TIMEOUT_MS, peerOptions, ROOM_PREFIX } from "./config";
+import {
+  applyCodecPreferences,
+  BitrateAdapter,
+  capVideoSender,
+  captureScreen,
+  CODEC_PRESETS,
+  preferVideoCodecsInSdp,
+  setContentHint,
+  type CaptureOptions,
+  type CodecPreset,
+  type ContentHint,
+} from "./media";
+import {
+  hashPassword,
+  parseConnectionMetadata,
+  parseToHost,
+  type ToViewer,
+} from "./protocol";
+import {
+  SenderStatsSampler,
+  type QualityLimitationReason,
+  type SenderStatsSample,
+} from "./stats";
+import { $, copyText, shortId, toast } from "./ui";
+
+const STORAGE_UPLOAD_KEY = "ping_upload_mbps";
+const DEFAULT_UPLOAD_MBPS = 50;
+const DEFAULT_MAX_VIEWERS = 5;
+const MAX_PW_ATTEMPTS = 3;
+const PW_FAILURE_DELAY_MS = 1200;
+
+interface ViewerEntry {
+  conn: DataConnection;
+  call: MediaConnection;
+  pc?: RTCPeerConnection;
+  clientId?: string;
+  sampler: SenderStatsSampler | null;
+  adapter: BitrateAdapter;
+  lastStats: SenderStatsSample | null;
+  cleanup: () => void;
+}
+
+interface PendingViewerEntry {
+  conn: DataConnection;
+  clientId?: string;
+  approve: () => void;
+  reject: () => void;
+  block: () => void;
+  cleanup: () => void;
+}
+
+function readStoredUploadMbps(): number {
+  try {
+    const raw = localStorage.getItem(STORAGE_UPLOAD_KEY);
+    if (!raw) return DEFAULT_UPLOAD_MBPS;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_UPLOAD_MBPS;
+  } catch {
+    return DEFAULT_UPLOAD_MBPS;
+  }
+}
+
+function writeStoredUploadMbps(val: number): void {
+  try {
+    localStorage.setItem(STORAGE_UPLOAD_KEY, String(val));
+  } catch {
+    // Ignora caso localStorage esteja bloqueado
+  }
+}
+
+function formatLimitation(reason: QualityLimitationReason | undefined): string {
+  switch (reason) {
+    case "bandwidth":
+      return "Banda";
+    case "cpu":
+      return "CPU";
+    case "other":
+      return "Outro";
+    case "none":
+      return "Nenhuma";
+    default:
+      return "—";
+  }
+}
+
+const TEMPLATE = `
+<main class="shell">
+  <header class="brand"><span class="dot"></span> Ping</header>
+
+  <section class="card" id="setup">
+    <h1>Compartilhe sua tela com os amigos</h1>
+    <p class="muted">O vídeo vai direto do seu computador para o navegador deles (P2P). Quem assiste não instala nada.</p>
+
+    <div class="grid">
+      <label>Taxa de quadros
+        <select id="fps">
+          <option value="30">30 FPS</option>
+          <option value="60" selected>60 FPS</option>
+        </select>
+      </label>
+      <label>Resolução
+        <select id="res">
+          <option value="720">720p</option>
+          <option value="1080" selected>1080p</option>
+          <option value="1440">1440p</option>
+          <option value="2160">4K</option>
+        </select>
+      </label>
+      <label>Bitrate máx. por espectador
+        <select id="br">
+          <option value="4000">4 Mbps</option>
+          <option value="8000" selected>8 Mbps</option>
+          <option value="12000">12 Mbps</option>
+          <option value="20000">20 Mbps</option>
+        </select>
+      </label>
+      <label>Tipo de conteúdo
+        <select id="hint">
+          <option value="motion" selected>Jogo / vídeo (prioriza fluidez)</option>
+          <option value="detail">Texto / slides (prioriza nitidez)</option>
+        </select>
+      </label>
+    </div>
+
+    <details class="advanced" id="advanced">
+      <summary>Opções avançadas de vídeo, rede e acesso</summary>
+      <div class="grid advanced-grid">
+        <label>Preferência de codec
+          <select id="codec">
+            <option value="vp9" selected>VP9 → AV1 → H.264 → VP8 (padrão)</option>
+            <option value="av1">AV1 → VP9 → H.264 → VP8</option>
+            <option value="h264">H.264 → VP9 → AV1 → VP8 (hardware)</option>
+            <option value="vp8">VP8 → H.264 → VP9 → AV1 (compatibilidade)</option>
+          </select>
+        </label>
+        <label>Meu upload em Mbps
+          <input type="number" id="upload-mbps" min="1" max="10000" step="1" value="50" />
+        </label>
+        <label>Máximo de espectadores
+          <input type="number" id="max-viewers" min="1" max="50" step="1" value="5" />
+        </label>
+        <label>Senha da sala (opcional)
+          <input type="password" id="room-password" placeholder="Em branco = sem senha" autocomplete="off" />
+        </label>
+      </div>
+      <label class="check advanced-check"><input type="checkbox" id="require-approval" /> Exigir aprovação manual para cada espectador</label>
+    </details>
+
+    <label class="check"><input type="checkbox" id="audio" checked /> Capturar áudio do sistema ou da aba</label>
+    <p class="warn" id="setup-capacity-warn" role="status" hidden></p>
+    <button id="start" type="button" class="primary">Iniciar transmissão</button>
+    <p class="warn" id="unsupported" hidden>Este navegador não consegue compartilhar a tela. Use Chrome, Edge ou Firefox no computador. Quem só assiste pode usar qualquer navegador.</p>
+  </section>
+
+  <section class="card" id="live" hidden>
+    <video id="preview" muted autoplay playsinline aria-label="Pré-visualização da tela capturada"></video>
+    <div class="row">
+      <input id="link" readonly aria-label="Link da sala" />
+      <button id="copy" type="button" class="primary">Copiar link</button>
+    </div>
+    <div class="row between">
+      <div class="live-meta">
+        <span id="count" class="muted" role="status" aria-live="polite">0 espectadores</span>
+        <span id="capacity-info" class="muted"></span>
+      </div>
+      <button id="stop" type="button" class="danger">Encerrar</button>
+    </div>
+    <p class="warn" id="capacity-warn" role="status" hidden></p>
+    <div id="pending-wrap" class="pending-wrap" role="region" aria-label="Solicitações de entrada pendentes" hidden>
+      <p class="pending-title">Aguardando aprovação</p>
+      <div id="pending-list" class="pending-list"></div>
+    </div>
+    <div id="stats-wrap" class="stats-wrap" hidden>
+      <table class="stats-table" aria-label="Estatísticas por espectador">
+        <thead>
+          <tr>
+            <th>Espectador</th>
+            <th>Codec</th>
+            <th>Bitrate</th>
+            <th>FPS</th>
+            <th>RTT</th>
+            <th>Limitação</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="stats-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+`;
+
+export function mountHost(root: HTMLElement): void {
+  root.innerHTML = TEMPLATE;
+
+  const setup = $<HTMLElement>(root, "#setup");
+  const live = $<HTMLElement>(root, "#live");
+  const startBtn = $<HTMLButtonElement>(root, "#start");
+  const stopBtn = $<HTMLButtonElement>(root, "#stop");
+  const copyBtn = $<HTMLButtonElement>(root, "#copy");
+  const preview = $<HTMLVideoElement>(root, "#preview");
+  const linkInput = $<HTMLInputElement>(root, "#link");
+  const countEl = $<HTMLElement>(root, "#count");
+  const capacityInfoEl = $<HTMLElement>(root, "#capacity-info");
+  const capacityWarnEl = $<HTMLElement>(root, "#capacity-warn");
+  const setupCapacityWarnEl = $<HTMLElement>(root, "#setup-capacity-warn");
+  const pendingWrap = $<HTMLElement>(root, "#pending-wrap");
+  const pendingList = $<HTMLElement>(root, "#pending-list");
+  const statsWrap = $<HTMLElement>(root, "#stats-wrap");
+  const statsBody = $<HTMLElement>(root, "#stats-body");
+  const uploadInput = $<HTMLInputElement>(root, "#upload-mbps");
+  const maxViewersInput = $<HTMLInputElement>(root, "#max-viewers");
+  const passwordInput = $<HTMLInputElement>(root, "#room-password");
+  const requireApprovalInput = $<HTMLInputElement>(root, "#require-approval");
+  const brSelect = $<HTMLSelectElement>(root, "#br");
+  const unsupported = $<HTMLElement>(root, "#unsupported");
+
+  uploadInput.value = String(readStoredUploadMbps());
+
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    unsupported.hidden = false;
+    startBtn.disabled = true;
+  }
+
+  let peer: Peer | null = null;
+  let stream: MediaStream | null = null;
+  let currentVideoTrack: MediaStreamTrack | null = null;
+  let startTimeout: number | undefined;
+  let statsInterval: number | undefined;
+  let activeBitrateKbps = Number(brSelect.value);
+  const viewers = new Map<string, ViewerEntry>();
+  const pendingViewers = new Map<string, PendingViewerEntry>();
+  const approvedClients = new Set<string>();
+  const blockedIds = new Set<string>();
+  const failedPasswordAttempts = new Map<string, number>();
+
+  const clearStartTimeout = (): void => {
+    if (startTimeout !== undefined) {
+      window.clearTimeout(startTimeout);
+      startTimeout = undefined;
+    }
+  };
+
+  const clearStatsInterval = (): void => {
+    if (statsInterval !== undefined) {
+      window.clearInterval(statsInterval);
+      statsInterval = undefined;
+    }
+  };
+
+  const getUploadLimitMbps = (): number => {
+    const val = Number(uploadInput.value);
+    return Number.isFinite(val) && val > 0 ? val : DEFAULT_UPLOAD_MBPS;
+  };
+
+  const updateCapacityUi = (): void => {
+    const limitMbps = getUploadLimitMbps();
+    const selectedBrMbps = Number(brSelect.value) / 1000;
+
+    if (selectedBrMbps > limitMbps) {
+      setupCapacityWarnEl.hidden = false;
+      setupCapacityWarnEl.textContent = `Aviso: 1 espectador a ${selectedBrMbps.toFixed(0)} Mbps já ultrapassa seu upload informado de ${limitMbps} Mbps.`;
+    } else {
+      setupCapacityWarnEl.hidden = true;
+    }
+
+    const n = viewers.size;
+    const perViewerMbps = activeBitrateKbps / 1000;
+    const requiredMbps = n * perViewerMbps;
+
+    capacityInfoEl.textContent = `· Upload estimado: ${requiredMbps.toFixed(1)} / ${limitMbps} Mbps`;
+
+    if (n > 0 && requiredMbps > limitMbps) {
+      capacityWarnEl.hidden = false;
+      capacityWarnEl.textContent = `Capacidade de upload excedida: ${n} espectador(es) × ${perViewerMbps.toFixed(0)} Mbps = ${requiredMbps.toFixed(1)} Mbps necessários (limite informado: ${limitMbps} Mbps).`;
+    } else {
+      capacityWarnEl.hidden = true;
+    }
+  };
+
+  const renderPendingList = (): void => {
+    if (pendingViewers.size === 0) {
+      pendingWrap.hidden = true;
+      pendingList.replaceChildren();
+      return;
+    }
+
+    pendingWrap.hidden = false;
+    const items: HTMLElement[] = [];
+
+    for (const [peerId, entry] of pendingViewers.entries()) {
+      const row = document.createElement("div");
+      row.className = "pending-row";
+
+      const label = document.createElement("span");
+      label.textContent = `Espectador #${peerId.slice(-6)}`;
+
+      const actions = document.createElement("div");
+      actions.className = "row";
+
+      const approveBtn = document.createElement("button");
+      approveBtn.type = "button";
+      approveBtn.className = "primary sm approve-btn";
+      approveBtn.textContent = "Aceitar";
+      approveBtn.addEventListener("click", entry.approve);
+
+      const rejectBtn = document.createElement("button");
+      rejectBtn.type = "button";
+      rejectBtn.className = "sm reject-btn";
+      rejectBtn.textContent = "Recusar";
+      rejectBtn.addEventListener("click", entry.reject);
+
+      const blockBtn = document.createElement("button");
+      blockBtn.type = "button";
+      blockBtn.className = "danger sm block-btn";
+      blockBtn.textContent = "Bloquear";
+      blockBtn.addEventListener("click", entry.block);
+
+      actions.append(approveBtn, rejectBtn, blockBtn);
+      row.append(label, actions);
+      items.push(row);
+    }
+
+    pendingList.replaceChildren(...items);
+  };
+
+  const kickViewer = (peerId: string): void => {
+    const entry = viewers.get(peerId);
+    if (!entry) return;
+    if (entry.clientId) approvedClients.delete(entry.clientId);
+    approvedClients.delete(peerId);
+    send(entry.conn, { t: "kicked" });
+    dropViewer(peerId);
+  };
+
+  const blockViewer = (peerId: string): void => {
+    const entry = viewers.get(peerId);
+    blockedIds.add(peerId);
+    if (entry?.clientId) {
+      blockedIds.add(entry.clientId);
+      approvedClients.delete(entry.clientId);
+    }
+    approvedClients.delete(peerId);
+    if (entry) {
+      send(entry.conn, { t: "denied", reason: "blocked" });
+      dropViewer(peerId);
+    }
+  };
+
+  const renderStatsTable = (): void => {
+    if (viewers.size === 0) {
+      statsWrap.hidden = true;
+      statsBody.replaceChildren();
+      return;
+    }
+
+    statsWrap.hidden = false;
+
+    // Remove linhas de espectadores que já saíram
+    for (const tr of [...statsBody.querySelectorAll<HTMLTableRowElement>("tr")]) {
+      const rowPeer = tr.dataset.peer;
+      if (!rowPeer || !viewers.has(rowPeer)) {
+        tr.remove();
+      }
+    }
+
+    for (const [peerId, entry] of viewers.entries()) {
+      let tr = statsBody.querySelector<HTMLTableRowElement>(
+        `tr[data-peer="${CSS.escape(peerId)}"]`,
+      );
+      if (!tr) {
+        tr = document.createElement("tr");
+        tr.dataset.peer = peerId;
+
+        for (let i = 0; i < 6; i++) {
+          tr.appendChild(document.createElement("td"));
+        }
+
+        const tdActions = document.createElement("td");
+        tdActions.className = "actions-cell";
+
+        const kickBtn = document.createElement("button");
+        kickBtn.type = "button";
+        kickBtn.className = "sm kick-btn";
+        kickBtn.textContent = "Remover";
+        kickBtn.addEventListener("click", () => kickViewer(peerId));
+
+        const blockBtn = document.createElement("button");
+        blockBtn.type = "button";
+        blockBtn.className = "danger sm block-btn";
+        blockBtn.textContent = "Bloquear";
+        blockBtn.addEventListener("click", () => blockViewer(peerId));
+
+        tdActions.append(kickBtn, blockBtn);
+        tr.appendChild(tdActions);
+        statsBody.appendChild(tr);
+      }
+
+      const cells = tr.querySelectorAll("td");
+      const s = entry.lastStats;
+
+      cells[0].textContent = `#${peerId.slice(-6)}`;
+      cells[1].textContent = s?.codec ?? "—";
+
+      const realMbps = ((s?.kbps ?? 0) / 1000).toFixed(1);
+      const capMbps = (entry.adapter.maxKbps / 1000).toFixed(1);
+      cells[2].textContent = entry.adapter.isReduced
+        ? `${realMbps} Mbps (teto ${capMbps})`
+        : `${realMbps} Mbps`;
+
+      cells[3].textContent = s ? `${s.fps} fps` : "—";
+      cells[4].textContent =
+        s && s.rttMs !== null ? `${Math.round(s.rttMs)} ms` : "—";
+      cells[5].textContent = formatLimitation(s?.qualityLimitationReason);
+      cells[5].className =
+        s?.qualityLimitationReason && s.qualityLimitationReason !== "none"
+          ? "limit-active"
+          : "";
+    }
+  };
+
+  uploadInput.addEventListener("input", () => {
+    const val = Number(uploadInput.value);
+    if (Number.isFinite(val) && val > 0) {
+      writeStoredUploadMbps(val);
+    }
+    updateCapacityUi();
+  });
+
+  brSelect.addEventListener("change", updateCapacityUi);
+  updateCapacityUi();
+
+  const send = (conn: DataConnection, msg: ToViewer): void => {
+    if (conn.open) {
+      try {
+        void conn.send(msg);
+      } catch {
+        // Ignora erro ao enviar em canal fechando
+      }
+    }
+  };
+
+  const broadcastCount = (): void => {
+    const n = viewers.size;
+    countEl.textContent = n === 1 ? "1 espectador" : `${n} espectadores`;
+    for (const { conn } of viewers.values()) send(conn, { t: "viewers", n });
+    updateCapacityUi();
+    renderStatsTable();
+  };
+
+  const dropPending = (id: string, expectedConn?: DataConnection): void => {
+    const entry = pendingViewers.get(id);
+    if (!entry) return;
+    if (expectedConn && entry.conn !== expectedConn) return;
+    pendingViewers.delete(id);
+    entry.cleanup();
+    renderPendingList();
+  };
+
+  const dropViewer = (
+    id: string,
+    expectedConn?: DataConnection,
+    silent = false,
+  ): void => {
+    const entry = viewers.get(id);
+    if (!entry) return;
+    if (expectedConn && entry.conn !== expectedConn) return;
+    viewers.delete(id);
+    entry.cleanup();
+    if (!silent) broadcastCount();
+  };
+
+  const readOptions = (): CaptureOptions & {
+    bitrateKbps: number;
+    hint: ContentHint;
+    codecPreset: CodecPreset;
+    maxViewers: number;
+    password: string;
+    requireApproval: boolean;
+  } => {
+    const rawMax = Number(maxViewersInput.value);
+    const maxViewers =
+      Number.isInteger(rawMax) && rawMax >= 1 && rawMax <= 50
+        ? rawMax
+        : DEFAULT_MAX_VIEWERS;
+    return {
+      fps: Number($<HTMLSelectElement>(root, "#fps").value),
+      height: Number($<HTMLSelectElement>(root, "#res").value),
+      audio: $<HTMLInputElement>(root, "#audio").checked,
+      bitrateKbps: Number(brSelect.value),
+      hint: $<HTMLSelectElement>(root, "#hint").value as ContentHint,
+      codecPreset: $<HTMLSelectElement>(root, "#codec").value as CodecPreset,
+      maxViewers,
+      password: passwordInput.value,
+      requireApproval: requireApprovalInput.checked,
+    };
+  };
+
+  const stop = (): void => {
+    clearStartTimeout();
+    clearStatsInterval();
+    if (currentVideoTrack) {
+      currentVideoTrack.removeEventListener("ended", stop);
+      currentVideoTrack = null;
+    }
+    for (const { conn } of pendingViewers.values()) {
+      send(conn, { t: "ended" });
+    }
+    for (const id of [...pendingViewers.keys()]) {
+      dropPending(id);
+    }
+    for (const { conn } of viewers.values()) send(conn, { t: "ended" });
+    for (const id of [...viewers.keys()]) dropViewer(id, undefined, true);
+    approvedClients.clear();
+    blockedIds.clear();
+    failedPasswordAttempts.clear();
+    countEl.textContent = "0 espectadores";
+    updateCapacityUi();
+    renderPendingList();
+    renderStatsTable();
+    stream?.getTracks().forEach((t) => t.stop());
+    stream = null;
+    if (peer) {
+      const oldPeer = peer;
+      peer = null;
+      oldPeer.removeAllListeners();
+      oldPeer.destroy();
+    }
+    preview.srcObject = null;
+    linkInput.value = "";
+    live.hidden = true;
+    setup.hidden = false;
+    startBtn.disabled = false;
+  };
+
+  const start = async (): Promise<void> => {
+    if (peer || stream) stop();
+    const opts = readOptions();
+    activeBitrateKbps = opts.bitrateKbps;
+    const codecOrder = CODEC_PRESETS[opts.codecPreset] ?? CODEC_PRESETS.vp9;
+    startBtn.disabled = true;
+
+    let captured: MediaStream;
+    try {
+      captured = await captureScreen(opts);
+    } catch {
+      toast("Captura cancelada ou negada.", "error");
+      startBtn.disabled = false;
+      return;
+    }
+    stream = captured;
+
+    if (opts.audio && captured.getAudioTracks().length === 0) {
+      toast(
+        "Sem áudio. Marque 'compartilhar áudio' na janela do navegador (Chrome/Edge, tela inteira ou aba).",
+      );
+    }
+
+    const videoTrack = captured.getVideoTracks()[0];
+    if (!videoTrack) {
+      toast("Nenhuma faixa de vídeo encontrada.", "error");
+      stop();
+      return;
+    }
+    currentVideoTrack = videoTrack;
+    setContentHint(videoTrack, opts.hint);
+    videoTrack.addEventListener("ended", stop);
+
+    const id = ROOM_PREFIX + shortId(12);
+    const expectedPwHash =
+      opts.password.length > 0
+        ? await hashPassword(id, opts.password)
+        : null;
+
+    const p = new Peer(id, peerOptions());
+    peer = p;
+
+    startTimeout = window.setTimeout(() => {
+      if (peer !== p || !live.hidden) return;
+      toast(
+        "Sinalização indisponível. Tempo esgotado ao conectar ao servidor PeerJS.",
+        "error",
+      );
+      stop();
+    }, CONNECT_TIMEOUT_MS);
+
+    p.on("open", (openedId) => {
+      if (peer !== p) return;
+      clearStartTimeout();
+      linkInput.value = `${location.origin}${location.pathname}?room=${openedId}`;
+      preview.srcObject = captured;
+      void preview.play().catch(() => undefined);
+      setup.hidden = true;
+      live.hidden = false;
+      broadcastCount();
+
+      clearStatsInterval();
+      statsInterval = window.setInterval(async () => {
+        if (peer !== p || viewers.size === 0) return;
+        await Promise.all(
+          [...viewers.values()].map(async (entry) => {
+            if (!entry.sampler || !entry.pc) return;
+            const sample = await entry.sampler.sample();
+            if (!sample) return;
+            entry.lastStats = sample;
+            const { changed, maxKbps } = entry.adapter.update(
+              sample.qualityLimitationReason,
+              1000,
+            );
+            if (changed) {
+              void capVideoSender(entry.pc, maxKbps, opts.fps, opts.hint);
+            }
+          }),
+        );
+        renderStatsTable();
+      }, 1000);
+    });
+
+    p.on("disconnected", () => {
+      if (peer !== p || p.destroyed) return;
+      p.reconnect();
+    });
+
+    p.on("error", (err) => {
+      if (peer !== p) return;
+      const type = String(err.type);
+      if (
+        type === "network" ||
+        type === "server-error" ||
+        type === "socket-error" ||
+        type === "socket-closed" ||
+        type === "ssl-unavailable"
+      ) {
+        toast(
+          "Sinalização indisponível. Verifique sua conexão ou o servidor PeerJS.",
+          "error",
+        );
+      } else {
+        toast(`Erro de sinalização: ${type}`, "error");
+      }
+      if (live.hidden) stop();
+    });
+
+    p.on("connection", (conn) => {
+      if (peer !== p || !stream) {
+        conn.close();
+        return;
+      }
+
+      const { clientId } = parseConnectionMetadata(conn.metadata);
+      const rateLimitKey = clientId ?? conn.peer;
+
+      if (
+        blockedIds.has(conn.peer) ||
+        (clientId !== undefined && blockedIds.has(clientId))
+      ) {
+        conn.on("open", () => {
+          send(conn, { t: "denied", reason: "blocked" });
+          conn.close({ flush: true });
+        });
+        return;
+      }
+
+      let welcomed = false;
+      let processingAuth = false;
+      let authDelayTimer: number | undefined;
+
+      const clearAuthDelay = (): void => {
+        if (authDelayTimer !== undefined) {
+          window.clearTimeout(authDelayTimer);
+          authDelayTimer = undefined;
+        }
+      };
+
+      const onConnClose = (): void => {
+        clearAuthDelay();
+        dropPending(conn.peer, conn);
+        dropViewer(conn.peer, conn);
+      };
+      const onConnError = (): void => {
+        clearAuthDelay();
+        dropPending(conn.peer, conn);
+        dropViewer(conn.peer, conn);
+      };
+
+      const admitViewer = (): void => {
+        if (peer !== p || !stream || welcomed) return;
+        welcomed = true;
+        dropPending(conn.peer, conn);
+
+        if (clientId) {
+          approvedClients.add(clientId);
+          for (const [existingPeerId, existingEntry] of viewers.entries()) {
+            if (existingEntry.clientId === clientId) {
+              dropViewer(existingPeerId, undefined, true);
+            }
+          }
+        }
+        approvedClients.add(conn.peer);
+
+        if (viewers.has(conn.peer)) {
+          dropViewer(conn.peer, undefined, true);
+        }
+
+        if (viewers.size >= opts.maxViewers) {
+          send(conn, { t: "denied", reason: "full" });
+          conn.close({ flush: true });
+          return;
+        }
+
+        const call = p.call(conn.peer, captured, {
+          metadata: { room: id },
+          sdpTransform: (sdp: string) =>
+            preferVideoCodecsInSdp(sdp, codecOrder),
+        });
+        if (!call) {
+          conn.close();
+          return;
+        }
+
+        const adapter = new BitrateAdapter(opts.bitrateKbps);
+        const pc = call.peerConnection as RTCPeerConnection | undefined;
+        if (pc) {
+          applyCodecPreferences(pc, codecOrder);
+        }
+
+        const apply = (): void => {
+          if (!pc) return;
+          applyCodecPreferences(pc, codecOrder);
+          void capVideoSender(pc, adapter.maxKbps, opts.fps, opts.hint);
+        };
+        apply();
+
+        let iceRecoveryTimer: number | undefined;
+        const clearIceTimer = (): void => {
+          if (iceRecoveryTimer !== undefined) {
+            window.clearTimeout(iceRecoveryTimer);
+            iceRecoveryTimer = undefined;
+          }
+        };
+
+        let cleaned = false;
+
+        const restartMediaIce = async (): Promise<void> => {
+          if (
+            cleaned ||
+            peer !== p ||
+            !stream ||
+            !pc ||
+            pc.signalingState === "closed"
+          ) {
+            return;
+          }
+          try {
+            applyCodecPreferences(pc, codecOrder);
+            if (typeof pc.restartIce === "function") {
+              pc.restartIce();
+            }
+            const offer = await pc.createOffer({ iceRestart: true });
+            if (cleaned || (pc.signalingState as string) === "closed") return;
+            await pc.setLocalDescription(offer);
+          } catch {
+            // Se a renegociação local falhar, o espectador reconectará via backoff
+          }
+        };
+
+        const onIceStateChange = (): void => {
+          if (!pc) return;
+          const state = pc.iceConnectionState;
+          if (state === "connected" || state === "completed") {
+            clearIceTimer();
+            apply();
+          } else if (state === "disconnected" || state === "failed") {
+            void restartMediaIce();
+            if (iceRecoveryTimer === undefined) {
+              iceRecoveryTimer = window.setTimeout(() => {
+                iceRecoveryTimer = undefined;
+                if (
+                  pc.iceConnectionState === "disconnected" ||
+                  pc.iceConnectionState === "failed" ||
+                  pc.iceConnectionState === "closed"
+                ) {
+                  dropViewer(conn.peer, conn);
+                }
+              }, 8_000);
+            }
+          } else if (state === "closed") {
+            clearIceTimer();
+            dropViewer(conn.peer, conn);
+          }
+        };
+        pc?.addEventListener("iceconnectionstatechange", onIceStateChange);
+
+        const onConnStateChange = (): void => {
+          if (!pc) return;
+          if (pc.connectionState === "connected") {
+            apply();
+          } else if (pc.connectionState === "closed") {
+            dropViewer(conn.peer, conn);
+          }
+        };
+        pc?.addEventListener("connectionstatechange", onConnStateChange);
+
+        const onCallClose = (): void => dropViewer(conn.peer, conn);
+        const onCallError = (): void => dropViewer(conn.peer, conn);
+        call.on("close", onCallClose);
+        call.on("error", onCallError);
+
+        const cleanup = (): void => {
+          if (cleaned) return;
+          cleaned = true;
+          clearAuthDelay();
+          clearIceTimer();
+          pc?.removeEventListener("iceconnectionstatechange", onIceStateChange);
+          pc?.removeEventListener("connectionstatechange", onConnStateChange);
+          call.off("close", onCallClose);
+          call.off("error", onCallError);
+          conn.off("data", onData);
+          conn.off("close", onConnClose);
+          conn.off("error", onConnError);
+          try {
+            call.close();
+          } catch {
+            // Ignora erro ao fechar chamada
+          }
+          try {
+            if (conn.open) conn.close({ flush: true });
+            else conn.close();
+          } catch {
+            // Ignora erro ao fechar conexão de dados
+          }
+        };
+
+        viewers.set(conn.peer, {
+          conn,
+          call,
+          pc,
+          clientId,
+          sampler: pc ? new SenderStatsSampler(pc) : null,
+          adapter,
+          lastStats: null,
+          cleanup,
+        });
+        send(conn, { t: "approved" });
+        send(conn, { t: "welcome" });
+        broadcastCount();
+      };
+
+      const onData = (data: unknown): void => {
+        if (peer !== p || !stream || welcomed || processingAuth) return;
+        const msg = parseToHost(data);
+        if (!msg) return;
+
+        // 1. Verifica bloqueio
+        if (
+          blockedIds.has(conn.peer) ||
+          (clientId !== undefined && blockedIds.has(clientId))
+        ) {
+          send(conn, { t: "denied", reason: "blocked" });
+          conn.close({ flush: true });
+          return;
+        }
+
+        // 2. Verifica capacidade máxima (permitindo reconexão de mesmo clientId)
+        const isExistingClient =
+          clientId !== undefined &&
+          [...viewers.values()].some((v) => v.clientId === clientId);
+        if (!isExistingClient && viewers.size >= opts.maxViewers) {
+          send(conn, { t: "denied", reason: "full" });
+          conn.close({ flush: true });
+          return;
+        }
+
+        // 3. Verifica senha opcional da sala (hash SHA-256)
+        if (expectedPwHash !== null) {
+          if (!msg.pwHash) {
+            send(conn, { t: "auth-required" });
+            return;
+          }
+
+          if (msg.pwHash !== expectedPwHash) {
+            processingAuth = true;
+            const attempts = (failedPasswordAttempts.get(rateLimitKey) ?? 0) + 1;
+            failedPasswordAttempts.set(rateLimitKey, attempts);
+
+            authDelayTimer = window.setTimeout(() => {
+              authDelayTimer = undefined;
+              processingAuth = false;
+              if (peer !== p || !conn.open) return;
+
+              if (attempts >= MAX_PW_ATTEMPTS) {
+                blockedIds.add(conn.peer);
+                if (clientId) blockedIds.add(clientId);
+                send(conn, { t: "denied", reason: "wrong-password" });
+                conn.close({ flush: true });
+              } else {
+                send(conn, {
+                  t: "auth-required",
+                  error: true,
+                  remaining: MAX_PW_ATTEMPTS - attempts,
+                });
+              }
+            }, PW_FAILURE_DELAY_MS);
+            return;
+          }
+
+          failedPasswordAttempts.delete(rateLimitKey);
+        }
+
+        // 4. Verifica aprovação manual opcional
+        const alreadyApproved =
+          approvedClients.has(conn.peer) ||
+          (clientId !== undefined && approvedClients.has(clientId));
+
+        if (opts.requireApproval && !alreadyApproved) {
+          if (pendingViewers.has(conn.peer)) return;
+
+          // Se já havia um pendente com o mesmo clientId, substitui
+          if (clientId) {
+            for (const [oldId, oldPending] of pendingViewers.entries()) {
+              if (oldPending.clientId === clientId) {
+                dropPending(oldId);
+              }
+            }
+          }
+
+          let pendingCleaned = false;
+          const cleanupPending = (): void => {
+            if (pendingCleaned) return;
+            pendingCleaned = true;
+            clearAuthDelay();
+          };
+
+          pendingViewers.set(conn.peer, {
+            conn,
+            clientId,
+            approve: () => admitViewer(),
+            reject: () => {
+              send(conn, { t: "denied", reason: "rejected" });
+              dropPending(conn.peer, conn);
+              conn.close({ flush: true });
+            },
+            block: () => {
+              blockedIds.add(conn.peer);
+              if (clientId) blockedIds.add(clientId);
+              send(conn, { t: "denied", reason: "blocked" });
+              dropPending(conn.peer, conn);
+              conn.close({ flush: true });
+            },
+            cleanup: cleanupPending,
+          });
+          send(conn, { t: "pending" });
+          renderPendingList();
+          return;
+        }
+
+        admitViewer();
+      };
+
+      conn.on("data", onData);
+      conn.on("close", onConnClose);
+      conn.on("error", onConnError);
+    });
+  };
+
+  startBtn.addEventListener("click", () => void start());
+  stopBtn.addEventListener("click", stop);
+  copyBtn.addEventListener("click", async () => {
+    const ok = await copyText(linkInput.value);
+    toast(ok ? "Link copiado. Cole no Discord." : "Não consegui copiar. Selecione e copie manualmente.");
+    if (!ok) linkInput.select();
+  });
+
+  window.addEventListener("beforeunload", stop);
+}

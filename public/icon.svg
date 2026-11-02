@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="ping-grad" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5b8cff" />
+      <stop offset="100%" stop-color="#7a5bff" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0b0d12" />
+  <rect x="76" y="108" width="360" height="248" rx="32" fill="#131722" stroke="url(#ping-grad)" stroke-width="24" />
+  <circle cx="256" cy="232" r="44" fill="url(#ping-grad)" />
+  <path d="M188 184a84 84 0 0 0 0 96M324 184a84 84 0 0 1 0 96" stroke="#e8ecf5" stroke-width="20" stroke-linecap="round" />
+  <path d="M176 416h160" stroke="#8d97ad" stroke-width="24" stroke-linecap="round" />
+</svg>
