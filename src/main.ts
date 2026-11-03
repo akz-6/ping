@@ -2,7 +2,10 @@ import { mountApp } from "./app/app";
 import { initTheme } from "./theme";
 import { mountViewer } from "./viewer";
 
+import { registerServiceWorker } from "./app/services/pwa";
+
 initTheme();
+registerServiceWorker();
 
 const app = document.getElementById("app");
 if (!app) throw new Error("#app não encontrado");

@@ -6,14 +6,32 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0b0d12",
-  "theme_color": "#0b0d12",
+  "orientation": "any",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "categories": ["utilities", "productivity", "social"],
   "icons": [
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Criar Sala",
+      "short_name": "Criar",
+      "description": "Iniciar uma nova transmissão de tela",
+      "url": "/?host=1",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Explorar Salas",
+      "short_name": "Salas",
+      "description": "Ver catálogo de salas disponíveis",
+      "url": "/",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
     }
   ]
 }

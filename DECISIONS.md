@@ -191,6 +191,20 @@ A política de segurança restritiva definida no `vercel.json` (`script-src 'sel
 - **Plano de Contingência (Migração para Opção B)**:
   - Caso o Supabase atinja cotas de uso do plano gratuito, a arquitetura permite alternar para a **Opção B (Vercel Functions + Upstash Redis)** apenas reimplementando a interface `RoomService` ([`src/app/services/rooms.ts`](file:///D:/Ping/ping-projeto/ping/src/app/services/rooms.ts)), sem precisar alterar nenhum componente de tela ou lógica de transmissão WebRTC do produto.
 
+---
+
+## 14. PWA, Service Worker e Acabamento Final (Fase 5)
+
+- **Service Worker com Cache de Shell Offline**:
+  - Implementado em [`public/sw.js`](file:///D:/Ping/ping-projeto/ping/public/sw.js) para garantir abertura rápida mesmo em conexões lentas ou instáveis.
+  - Pré-carrega os ativos essenciais do shell (`/`, `/index.html`, `/icon.svg`, `/manifest.webmanifest`, `/theme-init.js`).
+  - **Isolamento Rígido de Mídia**: O Service Worker nunca intercepta conexões WebSocket (`wss:`), WebRTC, PeerJS (`/peerjs`) nem chamadas de mídia.
+- **Manifest PWA e Atalhos de Sistema**:
+  - [`public/manifest.webmanifest`](file:///D:/Ping/ping-projeto/ping/public/manifest.webmanifest) configurado com suporte a `display: standalone`, categorias de utilitário/produtividade e atalhos rápidos do sistema para *"Criar Sala"* e *"Explorar Salas"*.
+- **Instalação Desacoplada no Perfil**:
+  - O aplicativo captura o evento nativo `beforeinstallprompt` via [`src/app/services/pwa.ts`](file:///D:/Ping/ping-projeto/ping/src/app/services/pwa.ts) e disponibiliza a opção de instalação no Modal de Perfil sem popups invasivos.
+
+
 
 
 

@@ -20,6 +20,7 @@ import {
 } from "../theme";
 import { toast } from "../ui";
 import { getConsentStatus, resetConsent, openConsentBanner } from "./services/ads";
+import { isPwaInstallable, promptPwaInstall } from "./services/pwa";
 
 /* ---------- ModalCriarSala ---------- */
 export function openCreateRoomModal(opts: {
@@ -335,6 +336,19 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     ),
   );
 
+  const pwaBtn = Button("Instalar aplicativo (PWA)", { variant: "secondary", block: true });
+  pwaBtn.hidden = !isPwaInstallable();
+  window.addEventListener("ping:pwa-installable", () => {
+    pwaBtn.hidden = false;
+  });
+  pwaBtn.addEventListener("click", async () => {
+    const installed = await promptPwaInstall();
+    if (installed) {
+      toast("Instalação do Ping concluída!");
+      pwaBtn.hidden = true;
+    }
+  });
+
   const body = h("div", { class: "dialog-form" });
   append(body, [
     header,
@@ -345,6 +359,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     appearance,
     palette,
     privacyBox,
+    pwaBtn,
     h("div", { class: "dialog-actions" }, resetBtn, close, save),
   ]);
 
