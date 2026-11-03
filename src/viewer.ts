@@ -9,6 +9,7 @@ import {
   hashPassword,
   parseToViewer,
   type DeniedReason,
+  type QualityPreset,
   type ToHost,
 } from "./protocol";
 import {
@@ -36,6 +37,15 @@ function formatQualityLabel(q: ConnectionQuality): string {
       return "Boa";
   }
 }
+
+const PRESET_LABELS: Record<QualityPreset, string> = {
+  source: "Auto (Original)",
+  "720p": "720p (Rápido)",
+  "480p": "480p (Mais Rápido)",
+  "360p": "360p (Super Leve)",
+};
+
+const PRESET_ORDER: QualityPreset[] = ["source", "720p", "480p", "360p"];
 
 function formatDeniedMessage(reason: DeniedReason | undefined): string {
   switch (reason) {
@@ -93,6 +103,10 @@ const TEMPLATE = `
           <span class="stat-label">Protocolo</span>
           <span class="stat-val">WebRTC P2P</span>
         </div>
+        <div class="discord-stat-item">
+          <span class="stat-label">Perfil Escolhido</span>
+          <span class="stat-val" id="ds-preset">Auto (Original)</span>
+        </div>
       </div>
     </div>
   </div>
@@ -111,6 +125,12 @@ const TEMPLATE = `
     <button id="sound" type="button" title="Ativar ou silenciar som (M)">Ativar som</button>
     <input id="vol" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
     <span id="quality" class="quality" data-level="good" role="status" aria-label="Qualidade da conexão: Boa" title="Qualidade da conexão">Boa</span>
+    <select id="quality-preset" class="viewer-quality-select" aria-label="Ajustar qualidade para economizar internet e aumentar velocidade" title="Reduzir qualidade para aumentar velocidade (Atalho: Q)">
+      <option value="source">✨ Auto (Original)</option>
+      <option value="720p">⚡ 720p (Rápido)</option>
+      <option value="480p">🚀 480p (Mais Rápido)</option>
+      <option value="360p">🔋 360p (Super Leve)</option>
+    </select>
     <span id="stats" class="stats" aria-live="off"></span>
     <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico da conexão em JSON">Diagnóstico</button>
     <button id="theater" type="button" title="Alternar Modo Teatro (T)">Teatro</button>
@@ -151,7 +171,44 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const dsBitrate = $<HTMLElement>(root, "#ds-bitrate");
   const dsFps = $<HTMLElement>(root, "#ds-fps");
   const dsCodec = $<HTMLElement>(root, "#ds-codec");
+  const dsPreset = $<HTMLElement>(root, "#ds-preset");
+  const qualitySelect = $<HTMLSelectElement>(root, "#quality-preset");
   const diagnosticBuffer = new CircularBuffer<ViewerDiagnosticSample>(300);
+
+  let currentPreset: QualityPreset = "source";
+  try {
+    const saved = localStorage.getItem("ping_viewer_quality") as QualityPreset | null;
+    if (saved && PRESET_ORDER.includes(saved)) {
+      currentPreset = saved;
+      qualitySelect.value = saved;
+      dsPreset.textContent = PRESET_LABELS[saved];
+    }
+  } catch {
+    // ignore
+  }
+
+  const setQualityPreset = (preset: QualityPreset, notify = true): void => {
+    currentPreset = preset;
+    qualitySelect.value = preset;
+    dsPreset.textContent = PRESET_LABELS[preset];
+    try {
+      localStorage.setItem("ping_viewer_quality", preset);
+    } catch {
+      // ignore
+    }
+    if (conn && conn.open) {
+      void conn.send({ t: "quality-preset", preset } satisfies ToHost);
+    }
+    if (notify) {
+      showOsd(`Qualidade: ${PRESET_LABELS[preset]}`);
+    }
+  };
+
+  qualitySelect.addEventListener("change", () => {
+    const val = qualitySelect.value as QualityPreset;
+    setQualityPreset(val, true);
+    showBarTemporarily();
+  });
 
   video.muted = true;
   video.defaultMuted = true;
@@ -428,6 +485,9 @@ export function mountViewer(root: HTMLElement, room: string): void {
           ? { t: "hello", pwHash: savedPwHash }
           : { t: "hello" };
         void c.send(helloMsg);
+        if (currentPreset !== "source") {
+          void c.send({ t: "quality-preset", preset: currentPreset } satisfies ToHost);
+        }
         if (!gotStream) {
           setStatus(
             reconnectAttempt > 0
@@ -473,6 +533,9 @@ export function mountViewer(root: HTMLElement, room: string): void {
           case "approved":
           case "welcome": {
             authWrap.hidden = true;
+            if (currentPreset !== "source" && conn && conn.open) {
+              void conn.send({ t: "quality-preset", preset: currentPreset } satisfies ToHost);
+            }
             if (!gotStream) {
               setStatus("Aguardando o vídeo do anfitrião…", false);
               clearAttemptTimeout();
@@ -861,10 +924,19 @@ export function mountViewer(root: HTMLElement, room: string): void {
       e.preventDefault();
       toggleStatsModal();
       showBarTemporarily();
+    } else if (e.key === "q" || e.key === "Q") {
+      e.preventDefault();
+      const currentIdx = PRESET_ORDER.indexOf(currentPreset);
+      const nextIdx = (currentIdx + 1) % PRESET_ORDER.length;
+      setQualityPreset(PRESET_ORDER[nextIdx], true);
+      showBarTemporarily();
     } else if (e.key === "Escape") {
       if (!discordStatsModal.hidden) {
+        e.preventDefault();
         discordStatsModal.hidden = true;
+        showBarTemporarily();
       }
+    } else if (e.key === " " || e.key === "k" || e.key === "K") {
       e.preventDefault();
       toggleMute();
       showOsd(video.muted ? "🔇 Silenciado" : "🔊 Som ativado");
@@ -926,6 +998,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
       timestamp: new Date().toISOString(),
       roomId: room,
       clientId,
+      qualityPreset: currentPreset,
       samplesCount: diagnosticBuffer.length,
       samples: diagnosticBuffer.getAll(),
     };

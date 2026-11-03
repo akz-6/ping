@@ -1,9 +1,16 @@
 // Mensagens trocadas no canal de dados (DataConnection) entre host e viewer.
 
-export type ToHost = {
-  t: "hello";
-  pwHash?: string;
-};
+export type QualityPreset = "source" | "720p" | "480p" | "360p";
+
+export type ToHost =
+  | {
+      t: "hello";
+      pwHash?: string;
+    }
+  | {
+      t: "quality-preset";
+      preset: QualityPreset;
+    };
 
 export type DeniedReason =
   | "rejected"
@@ -35,19 +42,33 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+const VALID_PRESETS = new Set<QualityPreset>(["source", "720p", "480p", "360p"]);
+
 /** Valida estritamente mensagens vindas do viewer para o host. */
 export function parseToHost(data: unknown): ToHost | null {
   if (!isPlainObject(data)) return null;
-  if (data.t !== "hello") return null;
 
-  if (data.pwHash !== undefined) {
-    if (typeof data.pwHash !== "string" || !SHA256_HEX_RE.test(data.pwHash)) {
-      return null;
+  if (data.t === "hello") {
+    if (data.pwHash !== undefined) {
+      if (typeof data.pwHash !== "string" || !SHA256_HEX_RE.test(data.pwHash)) {
+        return null;
+      }
+      return { t: "hello", pwHash: data.pwHash };
     }
-    return { t: "hello", pwHash: data.pwHash };
+    return { t: "hello" };
   }
 
-  return { t: "hello" };
+  if (data.t === "quality-preset") {
+    if (
+      typeof data.preset === "string" &&
+      VALID_PRESETS.has(data.preset as QualityPreset)
+    ) {
+      return { t: "quality-preset", preset: data.preset as QualityPreset };
+    }
+    return null;
+  }
+
+  return null;
 }
 
 /** Valida estritamente mensagens vindas do host para o viewer. */

@@ -17,6 +17,7 @@ import {
   hashPassword,
   parseConnectionMetadata,
   parseToHost,
+  type QualityPreset,
   type ToViewer,
 } from "./protocol";
 import {
@@ -44,6 +45,7 @@ interface ViewerEntry {
   adapter: BitrateAdapter;
   lastStats: SenderStatsSample | null;
   diagnosticBuffer: CircularBuffer<HostDiagnosticSample>;
+  qualityPreset?: QualityPreset;
   cleanup: () => void;
 }
 
@@ -222,6 +224,40 @@ const TEMPLATE = `
 </main>
 `;
 
+function getPresetParameters(
+  preset: QualityPreset | undefined,
+  baseMaxKbps: number,
+  baseFps: number,
+): { kbps: number; fps: number; scaleDown: number } {
+  switch (preset) {
+    case "720p":
+      return {
+        kbps: Math.min(baseMaxKbps, 2500),
+        fps: Math.min(baseFps, 60),
+        scaleDown: 1.5,
+      };
+    case "480p":
+      return {
+        kbps: Math.min(baseMaxKbps, 1200),
+        fps: Math.min(baseFps, 30),
+        scaleDown: 2.25,
+      };
+    case "360p":
+      return {
+        kbps: Math.min(baseMaxKbps, 600),
+        fps: Math.min(baseFps, 30),
+        scaleDown: 3,
+      };
+    case "source":
+    default:
+      return {
+        kbps: baseMaxKbps,
+        fps: baseFps,
+        scaleDown: 1,
+      };
+  }
+}
+
 export function mountHost(root: HTMLElement, mountOpts: { password?: string; roomId?: string; hostToken?: string } = {}): void {
   document.title = "Ping — Compartilhar Tela";
   root.innerHTML = TEMPLATE;
@@ -273,6 +309,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   let statsInterval: number | undefined;
   let activeBitrateKbps = Number(brSelect.value);
   const viewers = new Map<string, ViewerEntry>();
+  const requestedPresets = new Map<string, QualityPreset>();
   const pendingViewers = new Map<string, PendingViewerEntry>();
   const approvedClients = new Set<string>();
   const blockedIds = new Set<string>();
@@ -518,6 +555,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     if (!entry) return;
     if (expectedConn && entry.conn !== expectedConn) return;
     viewers.delete(id);
+    requestedPresets.delete(id);
     entry.cleanup();
     if (!silent) broadcastCount();
   };
@@ -571,6 +609,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     for (const id of [...viewers.keys()]) dropViewer(id, undefined, true);
     approvedClients.clear();
     blockedIds.clear();
+    requestedPresets.clear();
     failedPasswordAttempts.clear();
     countEl.textContent = "0 espectadores";
     updateCapacityUi();
@@ -603,6 +642,17 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     const opts = readOptions();
     activeBitrateKbps = opts.bitrateKbps;
     const codecOrder = CODEC_PRESETS[opts.codecPreset] ?? CODEC_PRESETS.vp9;
+
+    const applyViewerQuality = (entry: ViewerEntry): void => {
+      if (!entry.pc) return;
+      const { kbps, fps, scaleDown } = getPresetParameters(
+        entry.qualityPreset,
+        entry.adapter.maxKbps,
+        opts.fps,
+      );
+      applyCodecPreferences(entry.pc, codecOrder);
+      void capVideoSender(entry.pc, kbps, fps, opts.hint, scaleDown);
+    };
     startBtn.disabled = true;
 
     let captured: MediaStream;
@@ -673,7 +723,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
             if (!sample) return;
             entry.lastStats = sample;
             entry.diagnosticBuffer.push(sample.diagnostic);
-            const { changed, maxKbps } = entry.adapter.update(
+            const { changed } = entry.adapter.update(
               {
                 qualityLimitationReason: sample.qualityLimitationReason,
                 availableOutgoingBitrateKbps: sample.availableOutgoingBitrateKbps,
@@ -683,7 +733,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
               1000,
             );
             if (changed) {
-              void capVideoSender(entry.pc, maxKbps, opts.fps, opts.hint);
+              applyViewerQuality(entry);
             }
           }),
         );
@@ -803,8 +853,18 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
 
         const apply = (): void => {
           if (!pc) return;
-          applyCodecPreferences(pc, codecOrder);
-          void capVideoSender(pc, adapter.maxKbps, opts.fps, opts.hint);
+          const existingEntry = viewers.get(conn.peer);
+          if (existingEntry) {
+            applyViewerQuality(existingEntry);
+          } else {
+            const { kbps, fps, scaleDown } = getPresetParameters(
+              requestedPresets.get(conn.peer),
+              adapter.maxKbps,
+              opts.fps,
+            );
+            applyCodecPreferences(pc, codecOrder);
+            void capVideoSender(pc, kbps, fps, opts.hint, scaleDown);
+          }
         };
         apply();
 
@@ -911,7 +971,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         };
 
         const diagnosticBuffer = new CircularBuffer<HostDiagnosticSample>(300);
-        viewers.set(conn.peer, {
+        const entry: ViewerEntry = {
           conn,
           call,
           pc,
@@ -929,17 +989,32 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           adapter,
           lastStats: null,
           diagnosticBuffer,
+          qualityPreset: requestedPresets.get(conn.peer) ?? "source",
           cleanup,
-        });
+        };
+        viewers.set(conn.peer, entry);
+        applyViewerQuality(entry);
         send(conn, { t: "approved" });
         send(conn, { t: "welcome" });
         broadcastCount();
       };
 
       const onData = (data: unknown): void => {
-        if (peer !== p || !stream || welcomed || processingAuth) return;
+        if (peer !== p || !stream || processingAuth) return;
         const msg = parseToHost(data);
         if (!msg) return;
+
+        if (msg.t === "quality-preset") {
+          requestedPresets.set(conn.peer, msg.preset);
+          const entry = viewers.get(conn.peer);
+          if (entry) {
+            entry.qualityPreset = msg.preset;
+            applyViewerQuality(entry);
+          }
+          return;
+        }
+
+        if (welcomed) return;
 
         // 1. Verifica bloqueio
         if (
@@ -1084,6 +1159,12 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
               void sender.replaceTrack(newAudioTrack);
             }
           }
+          const { kbps, fps, scaleDown } = getPresetParameters(
+            entry.qualityPreset,
+            entry.adapter.maxKbps,
+            opts.fps,
+          );
+          void capVideoSender(entry.pc, kbps, fps, opts.hint, scaleDown);
         }
       }
 
@@ -1161,6 +1242,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       viewers: [...viewers.entries()].map(([id, entry]) => ({
         peerId: id,
         clientId: entry.clientId,
+        qualityPreset: entry.qualityPreset ?? "source",
         currentBitrateCapKbps: entry.adapter.maxKbps,
         isReduced: entry.adapter.isReduced,
         reductionReason: entry.adapter.reductionReason,

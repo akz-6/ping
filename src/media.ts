@@ -184,6 +184,7 @@ export async function capVideoSender(
   kbps: number,
   fps: number,
   hint: ContentHint,
+  scaleResolutionDownBy?: number,
 ): Promise<void> {
   for (const sender of pc.getSenders()) {
     if (sender.track?.kind !== "video") continue;
@@ -196,6 +197,11 @@ export async function capVideoSender(
     }
     params.encodings[0].maxBitrate = kbps * 1000;
     params.encodings[0].maxFramerate = fps;
+    if (typeof scaleResolutionDownBy === "number" && scaleResolutionDownBy > 1) {
+      params.encodings[0].scaleResolutionDownBy = scaleResolutionDownBy;
+    } else {
+      delete params.encodings[0].scaleResolutionDownBy;
+    }
     params.degradationPreference =
       hint === "motion" ? "maintain-framerate" : "maintain-resolution";
 

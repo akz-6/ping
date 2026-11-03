@@ -190,4 +190,73 @@ test.describe("Polimento Frontend & Pontas Soltas", () => {
     await page.keyboard.press("Escape");
     await expect(statsModal).toHaveAttribute("hidden", "");
   });
+
+  test("espectador pode diminuir qualidade do vídeo (seletor 720p/480p/360p e atalho Q) para aumentar velocidade e economizar internet", async ({ page }) => {
+    await page.goto("/?room=ping-testquality123");
+    await page.locator("#bar").evaluate((el) => { el.hidden = false; });
+
+    const qualitySelect = page.locator("#quality-preset");
+    const osd = page.locator("#osd");
+    const dsPreset = page.locator("#ds-preset");
+
+    await expect(qualitySelect).toBeVisible();
+    await expect(qualitySelect).toHaveValue("source");
+
+    // 1. Altera qualidade para 480p pelo select
+    await qualitySelect.selectOption("480p");
+    await expect(qualitySelect).toHaveValue("480p");
+    await expect(osd).toBeVisible();
+    await expect(osd).toHaveText(/480p \(Mais Rápido\)/);
+    await expect(dsPreset).toHaveText(/480p \(Mais Rápido\)/);
+
+    // 2. Valida persistência no localStorage
+    const saved = await page.evaluate(() => localStorage.getItem("ping_viewer_quality"));
+    expect(saved).toBe("480p");
+
+    // 3. Cicla para 360p via atalho de teclado 'q'
+    await page.keyboard.press("q");
+    await expect(qualitySelect).toHaveValue("360p");
+    await expect(osd).toBeVisible();
+    await expect(osd).toHaveText(/360p \(Super Leve\)/);
+
+    // 4. Recarrega a página e valida restauração automática da preferência do usuário
+    await page.reload();
+    await page.locator("#bar").evaluate((el) => { el.hidden = false; });
+    await expect(qualitySelect).toHaveValue("360p");
+  });
+
+  test("transmissão ponta a ponta: visualizador reduz qualidade e host adapta parâmetros de envio de vídeo", async ({ browser }) => {
+    const hostContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+    const viewerContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+
+    const hostPage = await hostContext.newPage();
+    const viewerPage = await viewerContext.newPage();
+
+    await hostPage.goto("/?host=1&admin=ping-master-2026");
+    await hostPage.locator("#start").click();
+    await expect(hostPage.locator("#live")).toBeVisible({ timeout: 15_000 });
+    const roomLink = await hostPage.locator("#link").inputValue();
+
+    await viewerPage.goto(roomLink);
+    await expect(viewerPage.locator("#bar")).toBeVisible({ timeout: 20_000 });
+
+    const qualitySelect = viewerPage.locator("#quality-preset");
+    await expect(qualitySelect).toBeVisible();
+
+    // Visualizador muda qualidade para 360p
+    await qualitySelect.selectOption("360p");
+    await expect(viewerPage.locator("#osd")).toHaveText(/360p/);
+
+    // Host verifica que a qualidade personalizada do viewer foi registrada no diagnóstico
+    await hostPage.bringToFront();
+    await hostPage.locator("#copy-diag").click({ force: true });
+    const hostDiag = await hostPage.evaluate(() => (window as any).__pingLastDiag);
+
+    expect(hostDiag).toBeTruthy();
+    expect(hostDiag.viewers.length).toBeGreaterThan(0);
+    expect(hostDiag.viewers[0].qualityPreset).toBe("360p");
+
+    await hostContext.close();
+    await viewerContext.close();
+  });
 });

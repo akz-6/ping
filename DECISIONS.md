@@ -275,6 +275,28 @@ Para oferecer paridade completa com a experiência de transmissão de tela do Di
     - **Codec de Vídeo**: Codec ativo extraído das estatísticas WebRTC (ex: VP9, H264).
     - **Protocolo**: WebRTC P2P com criptografia DTLS/SRTP.
 
+---
+
+## 18. Controle Individual de Qualidade pelo Visualizador (Resolução & Velocidade sob Demanda)
+
+- **Controle sob Demanda no Player (`#quality-preset` / Atalho `Q`)**:
+  - Implementado seletor de qualidade acessível na barra de controles do player (`#bar`) permitindo ao espectador escolher seu perfil de reprodução ideal:
+    - **✨ Auto (Original)**: Transmissão sem compressão adicional, taxa máxima de bits e resolução total nativa do host (ex: 1080p60 a até 8 Mbps).
+    - **⚡ 720p (Rápido)**: Downscale de `1.5x`, teto de `2500 kbps`, taxa de quadros de até 60 FPS.
+    - **🚀 480p (Mais Rápido)**: Downscale de `2.25x`, teto de `1200 kbps`, taxa de quadros de 30 FPS.
+    - **🔋 360p (Super Leve)**: Downscale de `3x`, teto de `600 kbps`, taxa de quadros de 30 FPS — projetado para redes instáveis, conexões móveis 3G/4G e economia de bateria/dados.
+- **Adaptação WebRTC por Peer no Anfitrião (`scaleResolutionDownBy`)**:
+  - Quando o espectador altera a qualidade, o Ping envia a mensagem de controle `{ t: "quality-preset", preset }` ao anfitrião via DataChannel.
+  - O anfitrião reconfigura exclusivamente o `RTCRtpSender` daquele espectador usando `sender.setParameters()` com `params.encodings[0].scaleResolutionDownBy` e `maxBitrate`.
+  - **Isolamento Total**: A escolha de um usuário em 360p **não afeta** os outros espectadores na mesma sala (que continuam recebendo a qualidade máxima ou seus respectivos perfis).
+- **Atalho de Teclado `Q` & Feedback OSD**:
+  - Tecla `Q` alterna sequencialmente entre os perfis (`Auto` → `720p` → `480p` → `360p` → `Auto`).
+  - O On-Screen Display (OSD) confirma visualmente a troca na tela do espectador por 1.8 segundos.
+- **Persistência Local**:
+  - A preferência é memorizada em `localStorage.getItem("ping_viewer_quality")` e restaurada automaticamente ao recarregar a página ou entrar em novas transmissões.
+- **Cobertura de Testes Automatizados**:
+  - Testes E2E ponta a ponta validando troca de opções no select, ciclograma via atalho `Q`, persistência no storage e adaptação real nos parâmetros de envio do anfitrião via diagnóstico WebRTC. Total de 51 testes automatizados cobrindo a suíte.
+
 
 
 
