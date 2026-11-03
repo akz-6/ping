@@ -52,32 +52,30 @@ function publicRoom(r: StoredRoom) {
   };
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  const url = new URL(req.url);
-  const method = req.method.toUpperCase();
+export default async function handler(req: any, res: any) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
 
-  const headers = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Cache-Control": "no-store, no-cache, must-revalidate",
-  };
+  const method = (req.method || "GET").toUpperCase();
 
   if (method === "OPTIONS") {
-    return new Response(null, { status: 204, headers });
+    return res.status(204).end();
   }
 
   try {
     if (method === "GET") {
       const rooms = await getStoredRooms();
-      return new Response(JSON.stringify(rooms.map(publicRoom)), { status: 200, headers });
+      return res.status(200).json(rooms.map(publicRoom));
     }
 
     if (method === "POST") {
-      const body = (await req.json()) as Partial<StoredRoom> & { isOwner?: boolean };
-      if (!body.name || !body.id) {
-        return new Response(JSON.stringify({ error: "Nome e ID são obrigatórios." }), { status: 400, headers });
+      const body = (typeof req.body === "string" ? JSON.parse(req.body) : req.body) as Partial<StoredRoom> & {
+        isOwner?: boolean;
+      };
+      if (!body || !body.name || !body.id) {
+        return res.status(400).json({ error: "Nome e ID são obrigatórios." });
       }
 
       const rooms = await getStoredRooms();
@@ -85,7 +83,7 @@ export default async function handler(req: Request): Promise<Response> {
 
       // Limite de 2 salas abertas no catálogo global (exceto se criado pelo dono com master key)
       if (!body.isPrivate && !body.isOwner && openCount >= 2) {
-        return new Response(JSON.stringify({ error: "LIMITE_SALAS_ABERTAS" }), { status: 403, headers });
+        return res.status(403).json({ error: "LIMITE_SALAS_ABERTAS" });
       }
 
       const now = Date.now();
@@ -105,19 +103,23 @@ export default async function handler(req: Request): Promise<Response> {
       const updatedList = [...rooms.filter((r) => r.id !== newRoom.id), newRoom];
       await saveStoredRooms(updatedList);
 
-      return new Response(JSON.stringify(publicRoom(newRoom)), { status: 201, headers });
+      return res.status(201).json(publicRoom(newRoom));
     }
 
     if (method === "PATCH") {
-      const body = (await req.json()) as { id: string; hostToken?: string; viewers?: number };
-      if (!body.id) {
-        return new Response(JSON.stringify({ error: "ID ausente." }), { status: 400, headers });
+      const body = (typeof req.body === "string" ? JSON.parse(req.body) : req.body) as {
+        id: string;
+        hostToken?: string;
+        viewers?: number;
+      };
+      if (!body?.id) {
+        return res.status(400).json({ error: "ID ausente." });
       }
 
       const rooms = await getStoredRooms();
       const target = rooms.find((r) => r.id === body.id);
       if (!target) {
-        return new Response(JSON.stringify({ ok: false }), { status: 404, headers });
+        return res.status(404).json({ ok: false });
       }
 
       target.updatedAt = Date.now();
@@ -126,25 +128,25 @@ export default async function handler(req: Request): Promise<Response> {
       }
 
       await saveStoredRooms(rooms);
-      return new Response(JSON.stringify({ ok: true, room: publicRoom(target) }), { status: 200, headers });
+      return res.status(200).json({ ok: true, room: publicRoom(target) });
     }
 
     if (method === "DELETE") {
-      const roomId = url.searchParams.get("id");
+      const roomId = req.query?.id || (typeof req.body === "object" ? req.body?.id : null);
       if (!roomId) {
-        return new Response(JSON.stringify({ error: "ID ausente." }), { status: 400, headers });
+        return res.status(400).json({ error: "ID ausente." });
       }
 
       const rooms = await getStoredRooms();
       const filtered = rooms.filter((r) => r.id !== roomId);
       await saveStoredRooms(filtered);
 
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+      return res.status(200).json({ ok: true });
     }
 
-    return new Response(JSON.stringify({ error: "Método não suportado." }), { status: 405, headers });
+    return res.status(405).json({ error: "Método não suportado." });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: msg }), { status: 500, headers });
+    return res.status(500).json({ error: msg });
   }
 }
