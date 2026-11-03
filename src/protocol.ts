@@ -19,7 +19,8 @@ export type ToViewer =
   | { t: "welcome" }
   | { t: "viewers"; n: number }
   | { t: "kicked" }
-  | { t: "ended" };
+  | { t: "ended" }
+  | { t: "pause"; paused: boolean };
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
 const CLIENT_ID_RE = /^[a-z0-9]{4,32}$/;
@@ -104,6 +105,11 @@ export function parseToViewer(data: unknown): ToViewer | null {
         return { t: "denied", reason: data.reason as DeniedReason };
       }
       return { t: "denied" };
+    }
+
+    case "pause": {
+      if (typeof data.paused !== "boolean") return null;
+      return { t: "pause", paused: data.paused };
     }
 
     default:

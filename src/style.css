@@ -461,3 +461,232 @@ body {
   font-size: 14px;
 }
 .toast.error { border-left-color: var(--danger); }
+
+/* Discord Streaming Features */
+.preview-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+
+.discord-live-pill {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: #f23f43;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+  animation: pulseLive 1.5s infinite ease-in-out;
+}
+
+@keyframes pulseLive {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.7); }
+}
+
+.paused-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 12;
+  color: var(--text-1);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.paused-card {
+  text-align: center;
+  background: rgba(22, 27, 34, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 32px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+}
+
+.paused-icon {
+  font-size: 38px;
+  margin-bottom: 8px;
+}
+
+.paused-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+.paused-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.live-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 6px;
+}
+
+.btn-discord-tool {
+  background: var(--card-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-discord-tool:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--primary);
+}
+
+.btn-discord-tool.active {
+  background: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
+}
+
+.viewer.theater-mode {
+  padding: 0;
+}
+
+.viewer.theater-mode video {
+  max-height: 100vh;
+  width: 100vw;
+}
+
+.bar button#theater.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.bar .quality {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.bar .quality:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--text-1);
+}
+
+.discord-stats-modal {
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  background: rgba(18, 20, 29, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 25;
+  width: 290px;
+  color: var(--text-1);
+}
+
+.discord-stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.discord-stats-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.discord-close-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.discord-close-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.discord-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 10px;
+}
+
+.discord-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.discord-stat-item .stat-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.discord-stat-item .stat-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+}
+
+.discord-stat-item .stat-val.status-good {
+  color: var(--ok);
+}
+
+.discord-stat-item .stat-val.status-fair {
+  color: #ffcf6b;
+}
+
+.discord-stat-item .stat-val.status-poor {
+  color: var(--danger);
+}

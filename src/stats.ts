@@ -28,6 +28,7 @@ export class CircularBuffer<T> {
 
 export interface ViewerDiagnosticSample {
   timestamp: number;
+  codec?: string | null;
   fps: number;
   kbps: number;
   width: number;
@@ -46,6 +47,7 @@ export interface ViewerDiagnosticSample {
 }
 
 export interface StatsSample {
+  codec?: string;
   fps: number;
   kbps: number;
   width: number;
@@ -144,6 +146,7 @@ export class StatsSampler {
     const report = await this.pc.getStats();
     let inbound: any = null;
     let rttMs: number | null = null;
+    const codecs = new Map<string, string>();
 
     report.forEach((r: any) => {
       if (r.type === "inbound-rtp" && r.kind === "video") inbound = r;
@@ -154,9 +157,18 @@ export class StatsSampler {
       ) {
         rttMs = r.currentRoundTripTime * 1000;
       }
+      if (r.type === "codec" && typeof r.mimeType === "string") {
+        codecs.set(
+          String(r.id),
+          r.mimeType.replace(/^video\//i, "").toUpperCase(),
+        );
+      }
     });
 
     if (!inbound) return null;
+
+    const codec =
+      (inbound.codecId && codecs.get(String(inbound.codecId))) || "VP9";
 
     let kbps = 0;
     if (this.lastTs > 0 && inbound.timestamp > this.lastTs) {
@@ -204,6 +216,7 @@ export class StatsSampler {
 
     const diagnostic: ViewerDiagnosticSample = {
       timestamp: Date.now(),
+      codec,
       fps,
       kbps: roundedKbps,
       width,
@@ -222,6 +235,7 @@ export class StatsSampler {
     };
 
     return {
+      codec,
       fps,
       kbps: roundedKbps,
       width,

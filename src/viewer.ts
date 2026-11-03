@@ -54,6 +54,48 @@ function formatDeniedMessage(reason: DeniedReason | undefined): string {
 const TEMPLATE = `
 <main class="viewer" aria-label="Reprodutor da transmissão">
   <video id="v" autoplay playsinline muted></video>
+  <div class="discord-live-pill" id="live-badge" hidden><span class="pulse-dot"></span> AO VIVO</div>
+  <div id="pause-overlay" class="paused-overlay" hidden>
+    <div class="paused-card">
+      <span class="paused-icon">⏸️</span>
+      <p class="paused-title">Transmissão Pausada</p>
+      <p class="paused-sub">O anfitrião pausou o compartilhamento de tela momentaneamente.</p>
+    </div>
+  </div>
+  <div id="discord-stats-modal" class="discord-stats-modal" hidden>
+    <div class="discord-stats-panel">
+      <div class="discord-stats-header">
+        <span class="discord-stats-title">📶 Estatísticas da Transmissão</span>
+        <button id="close-stats" type="button" class="discord-close-btn" aria-label="Fechar estatísticas">✕</button>
+      </div>
+      <div class="discord-stats-grid">
+        <div class="discord-stat-item">
+          <span class="stat-label">Qualidade</span>
+          <span class="stat-val status-ok" id="ds-status">Boa</span>
+        </div>
+        <div class="discord-stat-item">
+          <span class="stat-label">Latência (RTT)</span>
+          <span class="stat-val" id="ds-rtt">— ms</span>
+        </div>
+        <div class="discord-stat-item">
+          <span class="stat-label">Bitrate de Entrada</span>
+          <span class="stat-val" id="ds-bitrate">— Mbps</span>
+        </div>
+        <div class="discord-stat-item">
+          <span class="stat-label">Taxa de Quadros</span>
+          <span class="stat-val" id="ds-fps">— FPS</span>
+        </div>
+        <div class="discord-stat-item">
+          <span class="stat-label">Codec de Vídeo</span>
+          <span class="stat-val" id="ds-codec">—</span>
+        </div>
+        <div class="discord-stat-item">
+          <span class="stat-label">Protocolo</span>
+          <span class="stat-val">WebRTC P2P</span>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="osd" class="viewer-osd" role="status" aria-live="polite" hidden></div>
   <div id="status" class="status" role="status" aria-live="polite">Conectando…</div>
   <div id="auth-wrap" class="status" hidden>
@@ -71,6 +113,7 @@ const TEMPLATE = `
     <span id="quality" class="quality" data-level="good" role="status" aria-label="Qualidade da conexão: Boa" title="Qualidade da conexão">Boa</span>
     <span id="stats" class="stats" aria-live="off"></span>
     <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico da conexão em JSON">Diagnóstico</button>
+    <button id="theater" type="button" title="Alternar Modo Teatro (T)">Teatro</button>
     <button id="pip" type="button" title="Janela flutuante / Popout (P)" aria-label="Assistir em janela flutuante (Popout)">Popout</button>
     <button id="fs" type="button" title="Alternar tela cheia (F)">Tela cheia</button>
   </div>
@@ -98,6 +141,16 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const pipBtn = $<HTMLButtonElement>(root, "#pip");
   const fsBtn = $<HTMLButtonElement>(root, "#fs");
   const container = $<HTMLElement>(root, ".viewer");
+  const liveBadge = $<HTMLElement>(root, "#live-badge");
+  const pauseOverlay = $<HTMLElement>(root, "#pause-overlay");
+  const discordStatsModal = $<HTMLElement>(root, "#discord-stats-modal");
+  const closeStatsBtn = $<HTMLButtonElement>(root, "#close-stats");
+  const theaterBtn = $<HTMLButtonElement>(root, "#theater");
+  const dsStatus = $<HTMLElement>(root, "#ds-status");
+  const dsRtt = $<HTMLElement>(root, "#ds-rtt");
+  const dsBitrate = $<HTMLElement>(root, "#ds-bitrate");
+  const dsFps = $<HTMLElement>(root, "#ds-fps");
+  const dsCodec = $<HTMLElement>(root, "#ds-codec");
   const diagnosticBuffer = new CircularBuffer<ViewerDiagnosticSample>(300);
 
   video.muted = true;
@@ -286,6 +339,9 @@ export function mountViewer(root: HTMLElement, room: string): void {
     }
     cleanupCurrentAttempt();
     bar.hidden = true;
+    liveBadge.hidden = true;
+    pauseOverlay.hidden = true;
+    discordStatsModal.hidden = true;
     video.srcObject = null;
     setStatus(msg, isError);
   };
@@ -444,6 +500,12 @@ export function mountViewer(root: HTMLElement, room: string): void {
             break;
           }
 
+          case "pause": {
+            pauseOverlay.hidden = !msg.paused;
+            showOsd(msg.paused ? "⏸️ Transmissão pausada pelo anfitrião" : "▶️ Transmissão retomada");
+            break;
+          }
+
           case "viewers":
             break;
         }
@@ -541,6 +603,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
         }
         statusEl.hidden = true;
         bar.hidden = false;
+        liveBadge.hidden = false;
         showBarTemporarily();
 
         if (statsTimer === undefined) {
@@ -559,6 +622,14 @@ export function mountViewer(root: HTMLElement, room: string): void {
               "aria-label",
               `Qualidade da conexão: ${qLabel}`,
             );
+            if (!discordStatsModal.hidden) {
+              dsStatus.textContent = qLabel;
+              dsStatus.className = `stat-val status-${s.quality}`;
+              dsRtt.textContent = s.rttMs === null ? "—" : `${Math.round(s.rttMs)} ms`;
+              dsBitrate.textContent = `${(s.kbps / 1000).toFixed(1)} Mbps`;
+              dsFps.textContent = `${s.fps} FPS`;
+              dsCodec.textContent = s.diagnostic.codec || "VP9";
+            }
           }, 1000);
         }
       });
@@ -740,6 +811,20 @@ export function mountViewer(root: HTMLElement, room: string): void {
     showOsd("Janela flutuante fechada");
   });
 
+  const toggleTheater = (): void => {
+    container.classList.toggle("theater-mode");
+    const isTheater = container.classList.contains("theater-mode");
+    theaterBtn.classList.toggle("active", isTheater);
+    showOsd(isTheater ? "🎭 Modo Teatro ativado" : "Modo Teatro normal");
+  };
+
+  const toggleStatsModal = (): void => {
+    discordStatsModal.hidden = !discordStatsModal.hidden;
+    if (!discordStatsModal.hidden) {
+      showOsd("📶 Estatísticas da Transmissão");
+    }
+  };
+
   const onKeyDown = (e: KeyboardEvent): void => {
     if (finished || bar.hidden) return;
     if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -768,7 +853,18 @@ export function mountViewer(root: HTMLElement, room: string): void {
       e.preventDefault();
       void togglePip();
       showBarTemporarily();
-    } else if (e.key === " " || e.key === "k" || e.key === "K") {
+    } else if (e.key === "t" || e.key === "T") {
+      e.preventDefault();
+      toggleTheater();
+      showBarTemporarily();
+    } else if (e.key === "d" || e.key === "D") {
+      e.preventDefault();
+      toggleStatsModal();
+      showBarTemporarily();
+    } else if (e.key === "Escape") {
+      if (!discordStatsModal.hidden) {
+        discordStatsModal.hidden = true;
+      }
       e.preventDefault();
       toggleMute();
       showOsd(video.muted ? "🔇 Silenciado" : "🔊 Som ativado");
@@ -847,6 +943,20 @@ export function mountViewer(root: HTMLElement, room: string): void {
   pipBtn.addEventListener("click", () => {
     void togglePip();
     showBarTemporarily();
+  });
+
+  theaterBtn.addEventListener("click", () => {
+    toggleTheater();
+    showBarTemporarily();
+  });
+
+  qualityEl.addEventListener("click", () => {
+    toggleStatsModal();
+    showBarTemporarily();
+  });
+
+  closeStatsBtn.addEventListener("click", () => {
+    discordStatsModal.hidden = true;
   });
 
   fsBtn.addEventListener("click", () => {

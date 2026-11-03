@@ -87,4 +87,107 @@ test.describe("Polimento Frontend & Pontas Soltas", () => {
     const osd = page.locator("#osd");
     await expect(osd).toBeVisible();
   });
+
+  test("ferramentas de transmissão do Discord no host (trocar tela, pausar, mutar áudio)", async ({ page }) => {
+    await page.goto("/?host=1&admin=ping-master-2026");
+    await page.locator("#start").click();
+    await expect(page.locator("#live")).toBeVisible({ timeout: 15_000 });
+
+    const changeBtn = page.locator("#change-source");
+    const pauseBtn = page.locator("#pause-stream");
+    const muteBtn = page.locator("#mute-audio");
+    const livePill = page.locator(".discord-live-pill");
+    const pausedOverlay = page.locator("#host-paused-overlay");
+
+    await expect(changeBtn).toBeVisible();
+    await expect(changeBtn).toHaveText(/Trocar Tela/);
+
+    await expect(pauseBtn).toBeVisible();
+    await expect(pauseBtn).toHaveText("⏸️ Pausar Tela");
+
+    await expect(muteBtn).toBeVisible();
+    await expect(muteBtn).toHaveText("🔊 Áudio Ativo");
+
+    await expect(livePill).toBeVisible();
+    await expect(livePill).toHaveText(/AO VIVO/);
+    await expect(livePill.locator(".pulse-dot")).toBeVisible();
+
+    // Testa alternância de mute do áudio da transmissão
+    await muteBtn.click();
+    await expect(muteBtn).toHaveText("🔇 Áudio Mudo");
+    await expect(muteBtn).toHaveClass(/active/);
+    await muteBtn.click();
+    await expect(muteBtn).toHaveText("🔊 Áudio Ativo");
+    await expect(muteBtn).not.toHaveClass(/active/);
+
+    // Testa alternância de pausa de transmissão no host
+    await pauseBtn.click();
+    await expect(pauseBtn).toHaveText("▶️ Retomar Tela");
+    await expect(pauseBtn).toHaveClass(/active/);
+    await expect(pausedOverlay).toBeVisible();
+    await pauseBtn.click();
+    await expect(pauseBtn).toHaveText("⏸️ Pausar Tela");
+    await expect(pauseBtn).not.toHaveClass(/active/);
+    await expect(pausedOverlay).toBeHidden();
+  });
+
+  test("funcionalidades de transmissão do Discord no viewer (Modo Teatro, Badge Ao Vivo, Stats Modal)", async ({ page }) => {
+    await page.goto("/?room=ping-testpip123");
+    await page.locator("#bar").evaluate((el) => { el.hidden = false; });
+
+    const liveBadge = page.locator("#live-badge");
+    const pauseOverlay = page.locator("#pause-overlay");
+    const theaterBtn = page.locator("#theater");
+    const statsModal = page.locator("#discord-stats-modal");
+    const qualityBadge = page.locator("#quality");
+    const closeStatsBtn = page.locator("#close-stats");
+    const viewer = page.locator(".viewer");
+
+    await expect(liveBadge).toBeAttached();
+    await expect(liveBadge).toHaveText(/AO VIVO/);
+    await expect(liveBadge.locator(".pulse-dot")).toBeAttached();
+
+    await expect(pauseOverlay).toBeAttached();
+    await expect(pauseOverlay.locator(".paused-title")).toHaveText("Transmissão Pausada");
+
+    // Modo Teatro via botão
+    await expect(theaterBtn).toBeAttached();
+    await expect(theaterBtn).toHaveText("Teatro");
+    await theaterBtn.click();
+    await expect(viewer).toHaveClass(/theater-mode/);
+    await expect(theaterBtn).toHaveClass(/active/);
+
+    // Desativa Modo Teatro via botão
+    await theaterBtn.click();
+    await expect(viewer).not.toHaveClass(/theater-mode/);
+    await expect(theaterBtn).not.toHaveClass(/active/);
+
+    // Modo Teatro via atalho de teclado 't'
+    await page.keyboard.press("t");
+    await expect(viewer).toHaveClass(/theater-mode/);
+    await page.keyboard.press("t");
+    await expect(viewer).not.toHaveClass(/theater-mode/);
+
+    // Modal de Estatísticas WebRTC (Discord RTC Stats)
+    await expect(statsModal).toBeAttached();
+    await expect(statsModal).toHaveAttribute("hidden", "");
+
+    // Abre ao clicar no badge de qualidade
+    await qualityBadge.click();
+    await expect(statsModal).not.toHaveAttribute("hidden", "");
+    await expect(statsModal.locator(".discord-stats-title")).toHaveText(/Estatísticas da Transmissão/);
+    await expect(statsModal.locator("#ds-status")).toBeVisible();
+    await expect(statsModal.locator("#ds-fps")).toBeVisible();
+    await expect(statsModal.locator("#ds-codec")).toBeVisible();
+
+    // Fecha ao clicar no botão fechar (X)
+    await closeStatsBtn.click();
+    await expect(statsModal).toHaveAttribute("hidden", "");
+
+    // Abre via atalho de teclado 'd' e fecha via Escape
+    await page.keyboard.press("d");
+    await expect(statsModal).not.toHaveAttribute("hidden", "");
+    await page.keyboard.press("Escape");
+    await expect(statsModal).toHaveAttribute("hidden", "");
+  });
 });

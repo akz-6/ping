@@ -171,10 +171,21 @@ const TEMPLATE = `
   </section>
 
   <section class="card" id="live" hidden>
-    <video id="preview" muted autoplay playsinline aria-label="Pré-visualização da tela capturada"></video>
+    <div class="preview-wrap">
+      <video id="preview" muted autoplay playsinline aria-label="Pré-visualização da tela capturada"></video>
+      <div class="discord-live-pill"><span class="pulse-dot"></span> AO VIVO</div>
+      <div id="host-paused-overlay" class="paused-overlay" hidden>
+        <span>⏸️ Transmissão Pausada</span>
+      </div>
+    </div>
     <div class="row">
       <input id="link" readonly aria-label="Link da sala" />
       <button id="copy" type="button" class="primary">Copiar link</button>
+    </div>
+    <div class="row live-toolbar">
+      <button id="change-source" type="button" class="btn-discord-tool" title="Trocar janela ou tela compartilhada">🖥️ Trocar Tela</button>
+      <button id="pause-stream" type="button" class="btn-discord-tool" title="Pausar ou retomar vídeo da transmissão">⏸️ Pausar Tela</button>
+      <button id="mute-audio" type="button" class="btn-discord-tool" title="Silenciar ou ativar áudio da transmissão">🔊 Áudio Ativo</button>
     </div>
     <div class="row between">
       <div class="live-meta">
@@ -236,6 +247,12 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   const requireApprovalInput = $<HTMLInputElement>(root, "#require-approval");
   const brSelect = $<HTMLSelectElement>(root, "#br");
   const unsupported = $<HTMLElement>(root, "#unsupported");
+  const changeSourceBtn = $<HTMLButtonElement>(root, "#change-source");
+  const pauseStreamBtn = $<HTMLButtonElement>(root, "#pause-stream");
+  const muteAudioBtn = $<HTMLButtonElement>(root, "#mute-audio");
+  const hostPausedOverlay = $<HTMLElement>(root, "#host-paused-overlay");
+  let isStreamPaused = false;
+  let isAudioMuted = false;
 
   uploadInput.value = String(readStoredUploadMbps());
   if (mountOpts.password) {
@@ -567,6 +584,13 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       oldPeer.removeAllListeners();
       oldPeer.destroy();
     }
+    isStreamPaused = false;
+    isAudioMuted = false;
+    hostPausedOverlay.hidden = true;
+    pauseStreamBtn.textContent = "⏸️ Pausar Tela";
+    pauseStreamBtn.classList.remove("active");
+    muteAudioBtn.textContent = "🔊 Áudio Ativo";
+    muteAudioBtn.classList.remove("active");
     preview.srcObject = null;
     linkInput.value = "";
     live.hidden = true;
@@ -1031,6 +1055,76 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
 
   startBtn.addEventListener("click", () => void start());
   stopBtn.addEventListener("click", stop);
+
+  changeSourceBtn.addEventListener("click", async () => {
+    if (!stream) return;
+    const opts = readOptions();
+    try {
+      const newStream = await captureScreen(opts);
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const newAudioTrack = newStream.getAudioTracks()[0];
+      if (!newVideoTrack) {
+        toast("Nenhuma faixa de vídeo selecionada.", "error");
+        return;
+      }
+      setContentHint(newVideoTrack, opts.hint);
+      if (currentVideoTrack) {
+        currentVideoTrack.removeEventListener("ended", stop);
+        currentVideoTrack.stop();
+      }
+      currentVideoTrack = newVideoTrack;
+      newVideoTrack.addEventListener("ended", stop);
+
+      for (const entry of viewers.values()) {
+        if (entry.pc) {
+          for (const sender of entry.pc.getSenders()) {
+            if (sender.track?.kind === "video") {
+              void sender.replaceTrack(newVideoTrack);
+            } else if (sender.track?.kind === "audio" && newAudioTrack) {
+              void sender.replaceTrack(newAudioTrack);
+            }
+          }
+        }
+      }
+
+      stream = newStream;
+      preview.srcObject = newStream;
+      void preview.play().catch(() => undefined);
+      toast("Fonte de vídeo alterada com sucesso!");
+    } catch {
+      toast("Alteração de tela cancelada.", "info");
+    }
+  });
+
+  pauseStreamBtn.addEventListener("click", () => {
+    if (!currentVideoTrack) return;
+    isStreamPaused = !isStreamPaused;
+    currentVideoTrack.enabled = !isStreamPaused;
+    hostPausedOverlay.hidden = !isStreamPaused;
+    pauseStreamBtn.textContent = isStreamPaused ? "▶️ Retomar Tela" : "⏸️ Pausar Tela";
+    pauseStreamBtn.classList.toggle("active", isStreamPaused);
+
+    for (const entry of viewers.values()) {
+      send(entry.conn, { t: "pause", paused: isStreamPaused });
+    }
+    toast(isStreamPaused ? "Transmissão pausada." : "Transmissão retomada.");
+  });
+
+  muteAudioBtn.addEventListener("click", () => {
+    if (!stream) return;
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      toast("Sem áudio compartilhado nesta transmissão.", "info");
+      return;
+    }
+    isAudioMuted = !isAudioMuted;
+    audioTracks.forEach((t) => {
+      t.enabled = !isAudioMuted;
+    });
+    muteAudioBtn.textContent = isAudioMuted ? "🔇 Áudio Mudo" : "🔊 Áudio Ativo";
+    muteAudioBtn.classList.toggle("active", isAudioMuted);
+    toast(isAudioMuted ? "Áudio da transmissão silenciado." : "Áudio da transmissão ativado.");
+  });
   copyBtn.addEventListener("click", async () => {
     const ok = await copyText(linkInput.value);
     toast(ok ? "Link copiado. Cole no Discord." : "Não consegui copiar. Selecione e copie manualmente.");

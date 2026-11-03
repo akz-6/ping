@@ -245,7 +245,35 @@ A política de segurança restritiva definida no `vercel.json` (`script-src 'sel
 - **HUD / OSD (On-Screen Display)**:
   - Notificações de tela centralizadas inspiradas no ArtPlayer exibindo badges dinâmicos (`🖼️ Janela flutuante ativada (Popout)`, `🔊 Volume: X%`, `🔇 Silenciado`, `🔲 Tela cheia`) com temporização automática de 1.8s.
 - **Cobertura de Testes Automatizados**:
-  - Total de testes E2E Playwright expandido para **46 testes automatizados** (incluindo testes de estresse com 100 usuários, PWA, LGPD, criptografia PBKDF2, Popout e polimento de UI), todos executando com 100% de sucesso em ~22 segundos.
+  - Total de testes E2E Playwright expandido para **49 testes automatizados** (incluindo testes de estresse com 100 usuários, PWA, LGPD, criptografia PBKDF2, Popout, suíte completa do Discord e polimento de UI), todos executando com 100% de sucesso.
+
+---
+
+## 17. Suíte Completa de Transmissão Estilo Discord (Discord Screen Sharing & Broadcast Suite)
+
+Para oferecer paridade completa com a experiência de transmissão de tela do Discord:
+
+- **Troca de Janela/Tela ao Vivo sem Queda (`sender.replaceTrack`)**:
+  - O anfitrião pode clicar em `🖥️ Trocar Tela` a qualquer momento durante a transmissão ao vivo para escolher outra janela, tela cheia ou guia do navegador.
+  - A troca é realizada diretamente via WebRTC `sender.replaceTrack()` em todos os pares conectados, sem necessidade de renegociação SDP, reconexão de espectadores ou perda de áudio.
+- **Pausa de Transmissão ao Vivo (Freeze / Pause Stream)**:
+  - Botão `⏸️ Pausar Tela` no painel do host desativa a faixa de vídeo (`videoTrack.enabled = false`) e despacha a mensagem de protocolo `{ t: "pause", paused: true }` para todos os espectadores via DataChannel.
+  - No anfitrião e nos espectadores, um cartão visual *"⏸️ Transmissão Pausada"* com efeito de vidro fosco (`backdrop-filter`) é exibido sobre o player com feedback imediato via OSD.
+  - Ao clicar em `▶️ Retomar Tela`, o vídeo é reativado instantaneamente para todos os espectadores.
+- **Controle de Mudo de Áudio da Transmissão**:
+  - Botão `🔊 Áudio Ativo` / `🔇 Áudio Mudo` no host permite silenciar/reativar a faixa de áudio compartilhada (áudio do sistema ou da guia) sem interromper a transmissão de vídeo.
+- **Badge Discord "AO VIVO" (Live Pill)**:
+  - Badge vermelho flutuante estilo Discord com indicador pulsante (`.pulse-dot`) exibido no canto superior esquerdo tanto no preview do anfitrião quanto no player do espectador.
+- **Modo Teatro (`#theater` / Atalho `T`)**:
+  - Permite expandir o vídeo para ocupar toda a largura e altura da página (`100vw x 100vh`) com controles flutuantes semi-transparentes, sem a necessidade de travar em tela cheia do sistema operacional.
+- **Painel Flutuante de Estatísticas WebRTC (Discord RTC Stats Modal — Atalho `D`)**:
+  - Ao clicar no badge de qualidade de conexão ou pressionar `D` (ou `Esc` para fechar), um modal flutuante de diagnóstico exibe em tempo real:
+    - **Status da Conexão**: Excelente (verde), Instável (amarelo) ou Crítica (vermelho).
+    - **Ping (RTT)**: Tempo de ida e volta da rede em milissegundos.
+    - **Taxa de Bits (Bitrate)**: Consumo de download em Mbps.
+    - **Taxa de Quadros (FPS)**: Taxa de renderização instantânea (ex: 60 FPS).
+    - **Codec de Vídeo**: Codec ativo extraído das estatísticas WebRTC (ex: VP9, H264).
+    - **Protocolo**: WebRTC P2P com criptografia DTLS/SRTP.
 
 
 
