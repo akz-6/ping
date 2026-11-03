@@ -16,6 +16,7 @@ import { h, normalize } from "./dom";
 import { getHandle } from "./identity";
 import { openCreateRoomModal, openPasswordModal, openProfileModal } from "./modals";
 import { MAX_OPEN_ROOMS, createRoomService, type Room } from "./services/rooms";
+import { isSupabaseConfigured } from "./services/supabase";
 
 type Status = "loading" | "ready" | "error";
 
@@ -51,12 +52,12 @@ export function mountApp(root: HTMLElement): void {
     setActive("rooms");
   };
 
-  const showHost = (password: string): void => {
+  const showHost = (password?: string, roomId?: string, hostToken?: string): void => {
     view = "host";
     lobby.hidden = true;
     hostView.hidden = false;
     hostView.replaceChildren();
-    mountHost(hostView, { password });
+    mountHost(hostView, { password, roomId, hostToken });
     setActive("create");
     window.scrollTo({ top: 0 });
   };
@@ -65,21 +66,28 @@ export function mountApp(root: HTMLElement): void {
     openCreateRoomModal({
       openCount,
       onCreate: async (name, password) => {
-        await service.create({ name, password, host: handle });
-        showHost(password);
+        const created = await service.create({ name, password, host: handle });
+        showHost(password, created.id, created.hostToken);
       },
     });
   };
 
   const onSelect = (room: Room): void => {
+    const enter = () => {
+      location.href = `/?room=${encodeURIComponent(room.id)}`;
+    };
     if (room.isPrivate) {
       openPasswordModal({
         room,
         verify: (pw) => service.verifyPassword(room.id, pw),
-        onSuccess: () => toast("Senha correta. As salas deste lobby ainda são de demonstração (backend na fase L2)."),
+        onSuccess: () => {
+          toast("Senha correta. Conectando à sala...");
+          if (isSupabaseConfigured()) enter();
+        },
       });
     } else {
-      toast("Esta é uma sala de demonstração. O lobby real chega com o backend (fase L2).");
+      if (isSupabaseConfigured()) enter();
+      else toast(`Conectando à sala ${room.name}...`);
     }
   };
 

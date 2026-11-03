@@ -105,3 +105,21 @@ A política de segurança restritiva definida no `vercel.json` (`script-src 'sel
   - `/?host=1`: Modo anfitrião direto (para testes e atalhos rápidos).
   - `/?room=<id>`: Modo espectador direto WebRTC.
 - **Integração do Modal Criar Sala**: Criar uma sala no Lobby transiciona diretamente para o painel do anfitrião com o campo de senha pré-preenchido e o link de compartilhamento pronto para ser enviado.
+
+---
+
+## 9. Backend Supabase e Sincronização em Tempo Real (Fase L2)
+
+- **Tabela Espelho `rooms_public` & Limitação do Realtime**: O Supabase Realtime via Postgres CDC não oferece filtragem refinada de colunas em views. Para impedir o vazamento de hashes de senha (`pw_hash`), sais (`pw_salt`) e tokens do anfitrião (`host_token`), foi criada uma tabela espelho `rooms_public` sincronizada automaticamente por trigger na tabela base `rooms`. A tabela pública é adicionada à publicação `supabase_realtime` com permissão de leitura para `anon`, enquanto a tabela base permanece 100% inacessível diretamente por RLS.
+- **RPCs com `SECURITY DEFINER`**: Todas as mutações e validações sensíveis rodam no banco:
+  - `create_room`: aplica lazy cleanup de salas sem heartbeat há mais de 60 segundos e restringe a criação a no máximo 5 salas abertas ativas (erro `LIMITE_SALAS_ABERTAS`).
+  - `heartbeat_room` & `update_viewers`: exigem o token secreto gerado exclusivamente para o anfitrião no momento da criação.
+  - `get_room_salt`: retorna apenas o sal criptográfico para que o cliente derive o PBKDF2.
+  - `verify_room_password`: valida o hash sem nunca expor o hash original guardado no banco.
+- **Ciclo de Vida do Anfitrião**:
+  - Heartbeat periódico a cada 20 segundos via `heartbeat_room`.
+  - Atualização do contador de espectadores sincronizada com throttle de 1 segundo a partir das conexões ativas do PeerJS.
+  - Encerramento síncrono e assíncrono ao fechar a aba (`beforeunload` + `pagehide` utilizando `navigator.sendBeacon` e chamada RPC).
+- **Derivação de Senha PBKDF2**: Implementada nativamente com `crypto.subtle` (SHA-256 com 100.000 iterações e sal de 128 bits gerado por entropia criptográfica).
+- **Resiliência e Fallback Transparente**: Se `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` não forem configurados no ambiente, o sistema utiliza o `MockRoomService` local com dados de demonstração sem quebrar a execução.
+

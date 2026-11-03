@@ -5,6 +5,7 @@ export interface Room {
   isPrivate: boolean;
   viewers: number;
   capacity: number;
+  hostToken?: string;
 }
 
 export const MAX_OPEN_ROOMS = 5;
@@ -103,7 +104,11 @@ export class MockRoomService implements RoomService {
   }
 }
 
+import { isSupabaseConfigured, SupabaseRoomService } from "./supabase";
+
 export function createRoomService(): RoomService {
-  // O backend real (L2) ainda não existe: o mock é o único adaptador por enquanto.
+  if (isSupabaseConfigured() && import.meta.env.VITE_MOCK_ROOMS !== "true") {
+    return new SupabaseRoomService();
+  }
   return new MockRoomService();
 }

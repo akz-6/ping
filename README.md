@@ -79,6 +79,21 @@ A interface do Ping foi redesenhada com base nas especificações do Figma (`MNx
 
 Consulte [`DECISIONS.md`](./DECISIONS.md) para o detalhamento completo dos tokens de design, acessibilidade e arquitetura.
 
+### Configuração do Supabase (Backend Realtime - Fase L2)
+
+Para conectar o catálogo de salas e o Lobby a um banco Supabase em tempo real:
+
+1. Crie um projeto gratuito em [supabase.com](https://supabase.com).
+2. Abra o **SQL Editor** no painel do Supabase, cole o conteúdo de [`supabase/migrations/20261103_init_lobby.sql`](./supabase/migrations/20261103_init_lobby.sql) e clique em **Run**.
+3. Em **Project Settings → API**, copie a **Project URL** e a chave **anon public**.
+4. Configure no `.env.local` ou na Vercel:
+   ```env
+   VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+   VITE_SUPABASE_ANON_KEY=sua-chave-anon-publica
+   ```
+
+*(Se essas variáveis não forem preenchidas, o Ping executa normalmente com o mock local de demonstração).*
+
 ---
 
 ## Publicar na Vercel (Checklist de Deploy)

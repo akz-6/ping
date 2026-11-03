@@ -27,6 +27,7 @@ import {
   type SenderStatsSample,
 } from "./stats";
 import { $, copyText, shortId, toast } from "./ui";
+import { startHostLifecycle, type HostLifecycleHandle } from "./app/services/supabase";
 
 const STORAGE_UPLOAD_KEY = "ping_upload_mbps";
 const DEFAULT_UPLOAD_MBPS = 50;
@@ -210,7 +211,7 @@ const TEMPLATE = `
 </main>
 `;
 
-export function mountHost(root: HTMLElement, opts: { password?: string } = {}): void {
+export function mountHost(root: HTMLElement, mountOpts: { password?: string; roomId?: string; hostToken?: string } = {}): void {
   root.innerHTML = TEMPLATE;
 
   const setup = $<HTMLElement>(root, "#setup");
@@ -236,8 +237,8 @@ export function mountHost(root: HTMLElement, opts: { password?: string } = {}): 
   const unsupported = $<HTMLElement>(root, "#unsupported");
 
   uploadInput.value = String(readStoredUploadMbps());
-  if (opts.password) {
-    passwordInput.value = opts.password;
+  if (mountOpts.password) {
+    passwordInput.value = mountOpts.password;
     $<HTMLDetailsElement>(root, "#advanced").open = true;
   }
 
@@ -247,6 +248,7 @@ export function mountHost(root: HTMLElement, opts: { password?: string } = {}): 
   }
 
   let peer: Peer | null = null;
+  let hostLifecycle: HostLifecycleHandle | null = null;
   let stream: MediaStream | null = null;
   let currentVideoTrack: MediaStreamTrack | null = null;
   let startTimeout: number | undefined;
@@ -474,6 +476,7 @@ export function mountHost(root: HTMLElement, opts: { password?: string } = {}): 
   const broadcastCount = (): void => {
     const n = viewers.size;
     countEl.textContent = n === 1 ? "1 espectador" : `${n} espectadores`;
+    hostLifecycle?.syncViewers(n);
     for (const { conn } of viewers.values()) send(conn, { t: "viewers", n });
     updateCapacityUi();
     renderStatsTable();
@@ -532,6 +535,8 @@ export function mountHost(root: HTMLElement, opts: { password?: string } = {}): 
   };
 
   const stop = (): void => {
+    hostLifecycle?.stop();
+    hostLifecycle = null;
     clearStartTimeout();
     clearStatsInterval();
     if (currentVideoTrack) {
@@ -601,7 +606,7 @@ export function mountHost(root: HTMLElement, opts: { password?: string } = {}): 
     setContentHint(videoTrack, opts.hint);
     videoTrack.addEventListener("ended", stop);
 
-    const id = ROOM_PREFIX + shortId(12);
+    const id = mountOpts.roomId || ROOM_PREFIX + shortId(12);
     const expectedPwHash =
       opts.password.length > 0
         ? await hashPassword(id, opts.password)
@@ -627,6 +632,10 @@ export function mountHost(root: HTMLElement, opts: { password?: string } = {}): 
       void preview.play().catch(() => undefined);
       setup.hidden = true;
       live.hidden = false;
+      const token = mountOpts.hostToken || sessionStorage.getItem("ping:host_token:" + openedId) || "";
+      if (token) {
+        hostLifecycle = startHostLifecycle({ roomId: openedId, hostToken: token });
+      }
       broadcastCount();
 
       clearStatsInterval();
