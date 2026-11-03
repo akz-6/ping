@@ -37,6 +37,7 @@ async function saveStoredRooms(rooms: StoredRoom[]): Promise<void> {
   await put(BLOB_FILENAME, JSON.stringify(clean), {
     access: "public",
     addRandomSuffix: false,
+    allowOverwrite: true,
   });
 }
 
@@ -71,7 +72,8 @@ export default async function handler(req: any, res: any) {
     }
 
     if (method === "POST") {
-      const body = (typeof req.body === "string" ? JSON.parse(req.body) : req.body) as Partial<StoredRoom> & {
+      const raw = (typeof req.body === "string" ? JSON.parse(req.body) : req.body) as any;
+      const body = (raw?.room || raw) as Partial<StoredRoom> & {
         isOwner?: boolean;
       };
       if (!body || !body.name || !body.id) {
@@ -132,7 +134,20 @@ export default async function handler(req: any, res: any) {
     }
 
     if (method === "DELETE") {
-      const roomId = req.query?.id || (typeof req.body === "object" ? req.body?.id : null);
+      let roomId = req.query?.id as string | undefined;
+      if (!roomId && req.url && req.url.includes("?")) {
+        const urlParams = new URLSearchParams(req.url.split("?")[1]);
+        roomId = urlParams.get("id") ?? undefined;
+      }
+      if (!roomId && typeof req.body === "object") {
+        roomId = req.body?.id;
+      }
+      if (!roomId && typeof req.body === "string" && req.body.length > 0) {
+        try {
+          const parsed = JSON.parse(req.body);
+          roomId = parsed?.id;
+        } catch {}
+      }
       if (!roomId) {
         return res.status(400).json({ error: "ID ausente." });
       }
