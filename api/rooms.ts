@@ -24,10 +24,11 @@ async function getStoredRooms(): Promise<StoredRoom[]> {
     const target = blobs.find((b) => b.pathname === BLOB_FILENAME) ?? blobs[0];
     const res = await fetch(target.url, { cache: "no-store" });
     if (!res.ok) return [];
-    const list = (await res.json()) as StoredRoom[];
+    const stored = (await res.json()) as StoredRoom[];
     const now = Date.now();
-    return list.filter((r) => now - r.updatedAt < MAX_STALE_MS && now - r.createdAt < MAX_LIFETIME_MS);
-  } catch {
+    return stored.filter((r) => now - r.updatedAt < MAX_STALE_MS && now - r.createdAt < MAX_LIFETIME_MS);
+  } catch (err) {
+    console.error("Erro ao obter salas do Blob:", err);
     return [];
   }
 }
