@@ -455,6 +455,8 @@ body {
   .viewer-quality-select {
     padding: 6px 8px;
     font-size: 11px;
+    max-width: 140px;
+    flex-shrink: 1;
   }
   .stats {
     order: 10;

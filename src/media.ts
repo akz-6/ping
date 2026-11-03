@@ -189,26 +189,26 @@ export async function capVideoSender(
   for (const sender of pc.getSenders()) {
     if (sender.track?.kind !== "video") continue;
 
-    const params = sender.getParameters() as RTCRtpSendParameters & {
-      degradationPreference?: string;
-    };
-    if (!params.encodings || params.encodings.length === 0) {
-      params.encodings = [{}];
-    }
-    params.encodings[0].maxBitrate = kbps * 1000;
-    params.encodings[0].maxFramerate = fps;
-    if (typeof scaleResolutionDownBy === "number" && scaleResolutionDownBy > 1) {
-      params.encodings[0].scaleResolutionDownBy = scaleResolutionDownBy;
-    } else {
-      delete params.encodings[0].scaleResolutionDownBy;
-    }
-    params.degradationPreference =
-      hint === "motion" ? "maintain-framerate" : "maintain-resolution";
-
     try {
+      const params = sender.getParameters() as RTCRtpSendParameters & {
+        degradationPreference?: string;
+      };
+      if (!params.encodings || params.encodings.length === 0) {
+        params.encodings = [{}];
+      }
+      params.encodings[0].maxBitrate = kbps * 1000;
+      params.encodings[0].maxFramerate = fps;
+      if (typeof scaleResolutionDownBy === "number" && scaleResolutionDownBy > 1) {
+        params.encodings[0].scaleResolutionDownBy = scaleResolutionDownBy;
+      } else {
+        delete params.encodings[0].scaleResolutionDownBy;
+      }
+      params.degradationPreference =
+        hint === "motion" ? "maintain-framerate" : "maintain-resolution";
+
       await sender.setParameters(params);
     } catch {
-      // Negociação ainda não terminou ou o navegador recusou: tentamos de novo no "connected".
+      // Negociação ainda não terminou, conexão fechou ou o navegador recusou
     }
   }
 }

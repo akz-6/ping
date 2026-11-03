@@ -665,7 +665,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         entry.customFps,
       );
       applyCodecPreferences(entry.pc, codecOrder);
-      void capVideoSender(entry.pc, kbps, fps, opts.hint, scaleDown);
+      void capVideoSender(entry.pc, kbps, fps, opts.hint, scaleDown).catch(() => undefined);
     };
     startBtn.disabled = true;
 
@@ -878,7 +878,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
               requestedFps.get(conn.peer),
             );
             applyCodecPreferences(pc, codecOrder);
-            void capVideoSender(pc, kbps, fps, opts.hint, scaleDown);
+            void capVideoSender(pc, kbps, fps, opts.hint, scaleDown).catch(() => undefined);
           }
         };
         apply();

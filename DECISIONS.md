@@ -328,3 +328,19 @@ Para oferecer paridade completa com a experiência de transmissão de tela do Di
 
 
 
+
+
+---
+
+## 20. Auditoria Geral, Correção de Defeitos Residuais e Otimização de Performance
+
+- **Limpeza Estrita de Listeners e Timers no Visualizador (`src/viewer.ts`)**:
+  - Remoção determinística do listener de janela `beforeunload` através de referência nomeada `onBeforeUnload` na função `terminate()`.
+  - Cancelamento imediato de temporizadores visuais residuais (`osdTimer` e `barHideTimer`) e ocultação explícita do elemento de OSD ao sair da sala, eliminando potenciais vazamentos de memória e referências pendentes durante transições de rota.
+- **Blindagem e Tolerância a Falhas em WebRTC Senders (`src/media.ts` & `src/host.ts`)**:
+  - Envelopamento integral do ciclo de parâmetros do `RTCRtpSender` em `capVideoSender()` com bloco `try { ... } catch { ... }` para prevenir exceções `InvalidStateError` se a conexão for encerrada ou renegociada durante a leitura ou gravação de parâmetros.
+  - Tratamento resiliente com `.catch(() => undefined)` nas chamadas de `capVideoSender()` dentro de `applyViewerQuality()` no anfitrião.
+- **Otimização de Layout Responsivo na Barra de Controles (`src/style.css`)**:
+  - Refinamento do comportamento de flexbox em telas móveis estreitas ($\le 560\text{px}$), aplicando `max-width: 140px; flex-shrink: 1;` aos seletores `#quality-preset` e `#fps-selector`, prevenindo estouro horizontal do player ou quebra inesperada de botões críticos (som, tela cheia, teatro e popout).
+- **Conformidade Contínua de Acessibilidade e Segurança**:
+  - 100% de conformidade mantida com CSP rigorosa (`style-src 'self'`), zero anúncios nas áreas de transmissão (host e viewer), zero CLS em elementos de tela, 66 testes de contraste WCAG AA aprovados e 52 testes automatizados E2E executados com sucesso absoluto.

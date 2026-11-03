@@ -463,10 +463,18 @@ export function mountViewer(root: HTMLElement, room: string): void {
       backoffTimer = undefined;
     }
     clearBarHideTimer();
+    if (osdTimer !== undefined) {
+      window.clearTimeout(osdTimer);
+      osdTimer = undefined;
+    }
+    if (osdEl) {
+      osdEl.hidden = true;
+    }
     container.classList.remove("cursor-hidden");
     window.removeEventListener("online", onOnline);
     window.removeEventListener("offline", onOffline);
     window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("beforeunload", onBeforeUnload);
     if (document.pictureInPictureElement === video) {
       void document.exitPictureInPicture().catch(() => undefined);
     }
@@ -1126,10 +1134,12 @@ export function mountViewer(root: HTMLElement, room: string): void {
 
   video.addEventListener("dblclick", () => toggleFullscreen());
 
-  window.addEventListener("beforeunload", () => {
+  function onBeforeUnload(): void {
     if (finished) return;
     terminate("Conexão encerrada.", false);
-  });
+  }
+
+  window.addEventListener("beforeunload", onBeforeUnload);
 
   connectAttempt();
 }
