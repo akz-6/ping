@@ -1,4 +1,4 @@
-import type { QualityLimitationReason } from "./stats";
+﻿import type { QualityLimitationReason } from "./stats";
 
 export type ContentHint = "motion" | "detail";
 export type VideoCodec = "VP9" | "AV1" | "H264" | "VP8";

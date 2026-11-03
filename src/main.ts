@@ -1,4 +1,4 @@
-import { initTheme } from "./theme";
+﻿import { initTheme } from "./theme";
 import { registerServiceWorker } from "./app/services/pwa";
 import { checkUrlForCreatorKey } from "./app/auth-gate";
 

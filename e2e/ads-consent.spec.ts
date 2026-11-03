@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect } from "@playwright/test";
 
 test.describe("Fase L4 — Anúncios, Consentimento LGPD e Qualidade", () => {
   test.beforeEach(async ({ page }) => {

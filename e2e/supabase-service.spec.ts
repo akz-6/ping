@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 import { derivePasswordHash, generateSaltHex } from "../src/app/services/supabase";
 
 test.describe("Supabase & Criptografia - Fase L2", () => {

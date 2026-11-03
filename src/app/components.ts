@@ -14,7 +14,7 @@ const NAV_ITEMS: { id: NavId; label: string; icon: string }[] = [
 export interface SidebarApi {
   el: HTMLElement;
   setActive(id: NavId): void;
-  updateProfile(p: { displayName: string; handle: string; discordLinked?: boolean }): void;
+  updateProfile(p: { displayName: string; handle: string; discordLinked?: boolean; discordUsername?: string }): void;
 }
 
 export function SidebarNav(opts: {
@@ -77,15 +77,17 @@ export function SidebarNav(opts: {
     profileBtn,
   );
 
-  const updateProfile = (p: { displayName: string; handle: string; discordLinked?: boolean }) => {
+  const updateProfile = (p: { displayName: string; handle: string; discordLinked?: boolean; discordUsername?: string }) => {
     profileBtn.setAttribute("aria-label", `Abrir perfil de ${p.displayName}`);
     avatarWrap.replaceChildren(Avatar(p.displayName, 36));
     nameEl.textContent = p.displayName;
-    badgeEl.textContent = p.discordLinked ? "Discord" : (p.displayName === p.handle ? "Anônimo" : "Personalizado");
+    badgeEl.textContent = p.discordLinked
+      ? (p.discordUsername ? `@${p.discordUsername}` : "Discord")
+      : (p.displayName === p.handle ? "Anônimo" : "Personalizado");
   };
 
   window.addEventListener("ping:profile-updated", (e: Event) => {
-    const custom = e as CustomEvent<{ displayName: string; handle: string; discordLinked?: boolean }>;
+    const custom = e as CustomEvent<{ displayName: string; handle: string; discordLinked?: boolean; discordUsername?: string }>;
     if (custom.detail) updateProfile(custom.detail);
   });
 

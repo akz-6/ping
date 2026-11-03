@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 
 test.describe("Trava de Criação de Sala - Máquina Autorizada", () => {
   test("desbloqueio automático via parâmetro ?admin=ping-master-2026 na URL", async ({ page }) => {

@@ -15,7 +15,7 @@ async function prepare(page: import("@playwright/test").Page, palette: string, t
     },
     [palette, theme],
   );
-  await page.goto("/");
+  await page.goto("/?demo=1");
   await page.waitForSelector(".room-card:not(.is-skeleton)");
 }
 

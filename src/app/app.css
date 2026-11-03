@@ -730,6 +730,47 @@ html.scroll-lock { overflow: hidden; }
   line-height: 1.4;
 }
 
+.discord-linked-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--discord);
+  border-radius: var(--radius-control);
+}
+.discord-linked-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.discord-linked-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.discord-linked-tag {
+  font-weight: 600;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.discord-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(88, 101, 242, 0.15);
+  color: #5865F2;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
 .segmented { margin: 0; padding: 0; border: 0; min-width: 0; }
 .segmented legend { padding: 0; margin-bottom: var(--space-2); }
 .segmented-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }

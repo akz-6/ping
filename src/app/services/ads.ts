@@ -1,4 +1,4 @@
-import { h, icon } from "../dom";
+﻿import { h, icon } from "../dom";
 
 export type AdSize = "300x250" | "300x600" | "320x100";
 export type ConsentStatus = "accepted" | "essential" | "prompt";

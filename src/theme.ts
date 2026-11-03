@@ -1,4 +1,4 @@
-export type ThemeChoice = "light" | "dark" | "system";
+﻿export type ThemeChoice = "light" | "dark" | "system";
 export type Palette = "indigo" | "teal" | "terracota";
 
 export const PALETTES: { id: Palette; label: string; swatch: string }[] = [

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect } from "@playwright/test";
 
 test.describe("Fase 5 — Acabamento, PWA e Polimento Final", () => {
   test("manifest.webmanifest é servido corretamente e define app instalável", async ({ request }) => {

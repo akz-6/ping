@@ -44,14 +44,18 @@ export class RoomLimitError extends Error {
 
 /** Dados simulados (flag VITE_MOCK_ROOMS, ligada por padrão até o backend existir). Senha das salas fechadas de demonstração: "demo". */
 export class MockRoomService implements RoomService {
-  private rooms: Room[] = [
-    { id: "demo-publica-lotada", name: "Sala Pública (Demonstração)", host: "Sistema", isPrivate: false, viewers: 2, capacity: 2 },
-    { id: "demo-fechada-teste", name: "Sala Fechada (Exemplo)", host: "Moderador", isPrivate: true, viewers: 1, capacity: 2 },
-  ];
+  private rooms: Room[] = [];
   private listeners = new Set<(rooms: Room[]) => void>();
   private attempts = new Map<string, { used: number; lockedUntil: number }>();
 
-  constructor(private readonly latencyMs = 350) {}
+  constructor(private readonly latencyMs = 350, loadDemos = true) {
+    if (loadDemos) {
+      this.rooms = [
+        { id: "demo-publica-lotada", name: "Sala Pública (Demonstração)", host: "Sistema", isPrivate: false, viewers: 2, capacity: 2 },
+        { id: "demo-fechada-teste", name: "Sala Fechada (Exemplo)", host: "Moderador", isPrivate: true, viewers: 1, capacity: 2 },
+      ];
+    }
+  }
 
   private emit(): void {
     const snapshot = this.rooms.map((r) => ({ ...r }));
@@ -125,5 +129,10 @@ export function createRoomService(): RoomService {
   if (isSupabaseConfigured() && import.meta.env.VITE_MOCK_ROOMS !== "true") {
     return new SupabaseRoomService();
   }
-  return new MockRoomService();
+  const hasDemoParam =
+    typeof location !== "undefined" && new URLSearchParams(location.search).has("demo");
+  const envDemo = typeof import.meta !== "undefined" && import.meta.env?.VITE_DEMO_ROOMS === "true";
+
+  // Na inicialização padrão da plataforma, remove as salas exemplos e de demonstração:
+  return new MockRoomService(350, Boolean(hasDemoParam || envDemo));
 }

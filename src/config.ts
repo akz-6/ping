@@ -1,4 +1,4 @@
-import { Peer } from "peerjs";
+﻿import { Peer } from "peerjs";
 
 type PeerOptions = NonNullable<ConstructorParameters<typeof Peer>[1]>;
 

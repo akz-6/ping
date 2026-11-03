@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 import { BitrateAdapter } from "../src/media";
 
 test.describe("BitrateAdapter - Q1: Fim do laço de bitrate e controle seguro", () => {

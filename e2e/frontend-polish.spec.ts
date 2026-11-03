@@ -30,7 +30,7 @@ test.describe("Polimento Frontend & Pontas Soltas", () => {
   });
 
   test("empty state de busca sem resultados possui botão 'Limpar busca' que restaura o feed", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?demo=1");
     await expect(page.locator(".room-card:not(.is-skeleton)").first()).toBeVisible();
 
     // Digita busca sem correspondência
@@ -48,7 +48,7 @@ test.describe("Polimento Frontend & Pontas Soltas", () => {
   });
 
   test("avatares possuem paleta determinística variada (avatar-c0 até c5)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?demo=1");
     await expect(page.locator(".room-card:not(.is-skeleton)").first()).toBeVisible();
 
     const avatars = page.locator(".avatar");
@@ -73,6 +73,45 @@ test.describe("Polimento Frontend & Pontas Soltas", () => {
     // Valida que o preview do cabeçalho do perfil mudou imediatamente
     await expect(dlg.locator(".profile-handle")).toHaveText("EstrelaNinja");
     await expect(dlg.locator(".profile-head .avatar")).toHaveText("E");
+  });
+
+  test("conectar e desconectar conta do Discord no perfil atualiza a identidade", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".profile-card").click();
+
+    const dlg = page.getByRole("dialog", { name: "Seu perfil" });
+    await expect(dlg).toBeVisible();
+
+    // Clica no botão de conectar Discord
+    const connectBtn = dlg.locator("#btn-connect-discord");
+    await expect(connectBtn).toBeVisible();
+    await connectBtn.click();
+
+    // Modal de conexão do Discord abre
+    const discordModal = page.getByRole("dialog", { name: "Conectar com Discord" });
+    await expect(discordModal).toBeVisible();
+
+    const usernameInput = discordModal.locator("#discord-username-input");
+    await usernameInput.fill("pedro_streamer#1234");
+
+    // Confirma vínculo
+    await discordModal.locator("#discord-connect-confirm").click();
+
+    // Toast de sucesso
+    await expect(page.locator(".toast").last()).toContainText("vinculada com sucesso");
+
+    // Modal de perfil agora exibe a caixa de conta conectada
+    await expect(dlg.locator(".discord-linked-box")).toBeVisible();
+    await expect(dlg.locator(".discord-linked-tag")).toHaveText("@pedro_streamer#1234");
+    await expect(dlg.locator(".profile-badge")).toContainText("Discord");
+
+    // Desconecta a conta do Discord
+    const unlinkBtn = dlg.locator("#btn-unlink-discord");
+    await expect(unlinkBtn).toBeVisible();
+    await unlinkBtn.click();
+
+    await expect(page.locator(".toast").last()).toContainText("desconectada");
+    await expect(dlg.locator("#btn-connect-discord")).toBeVisible();
   });
 
   test("viewer possui botão de popout (Picture-in-Picture) e elemento OSD", async ({ page }) => {

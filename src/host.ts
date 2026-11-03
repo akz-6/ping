@@ -36,6 +36,55 @@ const DEFAULT_MAX_VIEWERS = 2;
 const MAX_PW_ATTEMPTS = 3;
 const PW_FAILURE_DELAY_MS = 1200;
 
+let joinAudioCtx: AudioContext | null = null;
+
+/**
+ * Toca um aviso sonoro (chime) suave no anfitrião quando um novo espectador entra.
+ * Usa Web Audio API nativo — sem arquivos externos e em total conformidade com CSP.
+ */
+export function playJoinChime(): void {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+
+    if (!joinAudioCtx || joinAudioCtx.state === "closed") {
+      joinAudioCtx = new AudioCtx();
+    }
+    if (joinAudioCtx.state === "suspended") {
+      void joinAudioCtx.resume();
+    }
+
+    const ctx = joinAudioCtx;
+    const now = ctx.currentTime;
+
+    const playTone = (freq: number, start: number, dur: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(start);
+      osc.stop(start + dur);
+    };
+
+    // Acorde em dois tons estilo Discord (D5 587.33Hz -> A5 880.00Hz)
+    playTone(587.33, now, 0.18);
+    playTone(880.0, now + 0.12, 0.28);
+  } catch {
+    // Silencia qualquer restrição de autoplay
+  }
+}
+
 interface ViewerEntry {
   conn: DataConnection;
   call: MediaConnection;
@@ -1010,6 +1059,8 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         };
         viewers.set(conn.peer, entry);
         applyViewerQuality(entry);
+        playJoinChime();
+        toast("Um novo espectador entrou na transmissão! 🔔");
         send(conn, { t: "approved" });
         send(conn, { t: "welcome", maxFps: opts.fps });
         broadcastCount();

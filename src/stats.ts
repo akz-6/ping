@@ -1,4 +1,4 @@
-export type QualityLimitationReason = "none" | "cpu" | "bandwidth" | "other";
+﻿export type QualityLimitationReason = "none" | "cpu" | "bandwidth" | "other";
 export type ConnectionQuality = "good" | "fair" | "poor";
 
 /** Buffer circular para diagnósticos de até 5 minutos (300 amostras a 1 Hz). */

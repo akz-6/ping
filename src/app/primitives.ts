@@ -1,4 +1,4 @@
-import { h, icon } from "./dom";
+﻿import { h, icon } from "./dom";
 
 /* ---------- Button ---------- */
 export type ButtonVariant = "primary" | "secondary" | "discord";

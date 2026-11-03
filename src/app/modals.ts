@@ -1,6 +1,13 @@
 import { Banner } from "./components";
-import { append, h } from "./dom";
-import { getProfile, resetIdentity, saveProfile, type UserProfile } from "./identity";
+import { append, discordIcon, h } from "./dom";
+import {
+  getProfile,
+  linkDiscordAccount,
+  resetIdentity,
+  saveProfile,
+  unlinkDiscordAccount,
+  type UserProfile,
+} from "./identity";
 import { Avatar, Button, Field, openDialog, setLoading } from "./primitives";
 import {
   MAX_OPEN_ROOMS,
@@ -242,13 +249,72 @@ function radioGroup<T extends string>(
   );
 }
 
-export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfile) => void }): void {
-  const profile = getProfile();
+/* ---------- ModalConectarDiscord ---------- */
+export function openDiscordConnectModal(opts: {
+  onConnected?: (p: UserProfile) => void;
+}): void {
+  const usernameField = Field({
+    label: "Seu usuário no Discord",
+    placeholder: "Ex: usuario ou usuario#0000",
+    maxLength: 32,
+  });
+  usernameField.input.id = "discord-username-input";
 
-  const connect = Button(
-    profile.discordLinked ? "Discord Conectado ✓" : "Conectar com Discord (Opcional)",
-    { variant: "discord", block: true },
+  const infoText = h(
+    "p",
+    { class: "field-hint" },
+    "Vincule sua conta do Discord para identificação nas salas de transmissão. Você poderá desvincular a qualquer momento.",
   );
+
+  const cancelBtn = Button("Cancelar", { variant: "secondary" });
+  const confirmBtn = Button("Autorizar e Vincular", {
+    variant: "discord",
+    type: "submit",
+    id: "discord-connect-confirm",
+  });
+
+  const actions = h("div", { class: "dialog-actions" }, cancelBtn, confirmBtn);
+  const form = h("form", { class: "dialog-form" }, usernameField.el, infoText, actions);
+
+  const dlg = openDialog({
+    title: "Conectar com Discord",
+    subtitle: "Exiba sua identidade do Discord na plataforma Ping.",
+    body: [form],
+  });
+
+  cancelBtn.addEventListener("click", () => dlg.close());
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const val = usernameField.input.value.trim();
+    if (!val) {
+      usernameField.setError("Digite seu nome de usuário do Discord.");
+      usernameField.input.focus();
+      return;
+    }
+    usernameField.setError(null);
+    setLoading(confirmBtn, true);
+    dlg.setBusy(true);
+
+    try {
+      const updated = linkDiscordAccount(val);
+      dlg.setBusy(false);
+      setLoading(confirmBtn, false);
+      dlg.close();
+      toast(`Conta do Discord (@${updated.discordUsername}) vinculada com sucesso!`);
+      opts.onConnected?.(updated);
+    } catch {
+      dlg.setBusy(false);
+      setLoading(confirmBtn, false);
+      usernameField.setError("Não foi possível vincular. Tente novamente.");
+    }
+  });
+
+  window.setTimeout(() => usernameField.input.focus(), 50);
+}
+
+export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfile) => void }): void {
+  let profile = getProfile();
 
   const nick = Field({
     label: "Apelido de exibição",
@@ -270,7 +336,20 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
 
   const avatarWrap = h("div", { class: "profile-avatar-wrap" }, Avatar(profile.displayName, 72));
   const handleLabel = h("p", { class: "profile-handle" }, profile.displayName);
-  const badgeLabel = h("span", { class: "profile-badge" }, profile.discordLinked ? "Discord" : (profile.displayName === profile.handle ? "Anônimo" : "Personalizado"));
+  const badgeLabel = h("span", { class: "profile-badge" }, "");
+
+  const updateHeader = (): void => {
+    const val = nick.input.value.trim();
+    const typed = val || profile.displayName || profile.handle;
+    handleLabel.textContent = typed;
+    avatarWrap.replaceChildren(Avatar(typed, 72));
+    badgeLabel.textContent = profile.discordLinked
+      ? `Discord: @${profile.discordUsername || "conectado"}`
+      : !val || val === profile.handle
+      ? "Anônimo"
+      : "Personalizado";
+  };
+  updateHeader();
 
   const header = h(
     "div",
@@ -285,16 +364,66 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
   );
 
   nick.input.addEventListener("input", () => {
-    const val = nick.input.value.trim();
-    const typed = val || profile.handle;
-    handleLabel.textContent = typed;
-    avatarWrap.replaceChildren(Avatar(typed, 72));
-    badgeLabel.textContent = profile.discordLinked
-      ? "Discord"
-      : !val || val === profile.handle
-      ? "Anônimo"
-      : "Personalizado";
+    updateHeader();
   });
+
+  const discordSlot = h("div", { class: "profile-discord-slot" });
+
+  const renderDiscordSlot = (): void => {
+    discordSlot.replaceChildren();
+    if (profile.discordLinked) {
+      const unlinkBtn = Button("Desconectar", {
+        variant: "secondary",
+        id: "btn-unlink-discord",
+        onClick: () => {
+          profile = unlinkDiscordAccount();
+          updateHeader();
+          renderDiscordSlot();
+          opts.onSaved?.(profile);
+          toast("Conta do Discord desconectada.");
+        },
+      });
+
+      const box = h(
+        "div",
+        { class: "discord-linked-box" },
+        h(
+          "div",
+          { class: "discord-linked-info" },
+          discordIcon(24),
+          h(
+            "div",
+            { class: "discord-linked-text" },
+            h("span", { class: "discord-linked-tag" }, `@${profile.discordUsername || "Discord"}`),
+            h("span", { class: "discord-badge-pill" }, "Conectado"),
+          ),
+        ),
+        unlinkBtn,
+      );
+      discordSlot.append(box);
+    } else {
+      const connectBtn = Button("Conectar com Discord (Opcional)", {
+        variant: "discord",
+        block: true,
+        id: "btn-connect-discord",
+        onClick: () => {
+          openDiscordConnectModal({
+            onConnected: (updated) => {
+              profile = updated;
+              if (nick.input.value === "" || nick.input.value === profile.handle) {
+                nick.input.value = profile.displayName;
+              }
+              updateHeader();
+              renderDiscordSlot();
+              opts.onSaved?.(profile);
+            },
+          });
+        },
+      });
+      discordSlot.append(connectBtn);
+    }
+  };
+  renderDiscordSlot();
 
   const note = h(
     "p",
@@ -368,7 +497,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     header,
     nick.el,
     full.el,
-    connect,
+    discordSlot,
     note,
     appearance,
     palette,
@@ -393,17 +522,12 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
   });
 
   resetBtn.addEventListener("click", () => {
-    const fresh = resetIdentity();
+    profile = resetIdentity();
     nick.input.value = "";
     full.input.value = "";
-    handleLabel.textContent = fresh.displayName;
-    avatarWrap.replaceChildren(Avatar(fresh.displayName, 72));
-    badgeLabel.textContent = "Anônimo";
-    opts.onSaved?.(fresh);
+    updateHeader();
+    renderDiscordSlot();
+    opts.onSaved?.(profile);
     toast("Identidade local redefinida.");
-  });
-
-  connect.addEventListener("click", () => {
-    toast("Vínculo com Discord (opcional) disponível.");
   });
 }

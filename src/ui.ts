@@ -1,4 +1,4 @@
-export function $<T extends HTMLElement>(root: ParentNode, selector: string): T {
+﻿export function $<T extends HTMLElement>(root: ParentNode, selector: string): T {
   const el = root.querySelector<T>(selector);
   if (!el) throw new Error(`Elemento não encontrado: ${selector}`);
   return el;

@@ -1,4 +1,4 @@
-// Gerenciamento de PWA e instalação nativa (Fase 5)
+﻿// Gerenciamento de PWA e instalação nativa (Fase 5)
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;

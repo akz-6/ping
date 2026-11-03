@@ -1,4 +1,4 @@
-// Mensagens trocadas no canal de dados (DataConnection) entre host e viewer.
+﻿// Mensagens trocadas no canal de dados (DataConnection) entre host e viewer.
 
 export type QualityPreset = "source" | "720p" | "480p" | "360p";
 

@@ -375,3 +375,23 @@ Para oferecer paridade completa com a experiência de transmissão de tela do Di
   - `MAX_OPEN_ROOMS` ajustado para `2`.
   - Ao atingir 2 salas abertas, o sistema bloqueia criações não autenticadas e exige a chave mestra (`0604`).
   - O dono ("eu"), autenticado com a chave mestra (`isOwner: true`), tem permissão irrestrita para criar e gerenciar salas na plataforma.
+
+---
+
+## 23. Conexão Discord Interativa, Início Limpo sem Salas Fake e Alerta Sonoro do Anfitrião
+
+- **Conexão Real e Interativa com Discord (`src/app/identity.ts` & `src/app/modals.ts`)**:
+  - Implementado fluxo completo de vínculo com Discord em `openDiscordConnectModal()` e `openProfileModal()`.
+  - Armazenamento persistente de `ping:discord_linked` e `ping:discord_user` (`@usuario` ou `usuario#tag`).
+  - Suporte reativo em tempo real: ao vincular, atualiza imediatamente o cabeçalho do perfil, substitui o botão de conectar por uma caixa de status com badge oficial Discord e botão de desvincular ("Desconectar").
+  - Atualização automática dos badges no SidebarNav e na navegação móvel ao despachar o evento `ping:profile-updated`.
+- **Início Limpo sem Salas Exemplos/Fake no Lobby (`src/app/services/rooms.ts` & `src/app/app.ts`)**:
+  - Retiradas as salas fictícias de demonstração (`Sala Pública (Demonstração)` e `Sala Fechada (Exemplo)`) do carregamento inicial em produção.
+  - O lobby inicia 100% limpo, renderizando nativamente o estado vazio com o botão de criação de sala (`EmptyState: "Nenhuma sala por aqui ainda"`).
+  - Parâmetro `/?demo=1` mantido como opt-in opcional para validações e testes automatizados de componentes visuais.
+- **Alerta Sonoro de Entrada de Espectador no Anfitrião (`src/host.ts`)**:
+  - Implementada a função `playJoinChime()` utilizando a Web Audio API nativa (`AudioContext`).
+  - Síntese de acorde suave em dois tons senoidais inspirado no Discord (D5 a 587.33 Hz seguido por A5 a 880.00 Hz com decaimento exponencial).
+  - Executado automaticamente dentro de `admitViewer()` quando um novo espectador conecta na transmissão, acompanhado por notificação visual Toast ("Um novo espectador entrou na transmissão! 🔔").
+  - Zero arquivos de áudio externos, garantindo 100% de conformidade com a rigorosa CSP da aplicação (`media-src 'self' blob: mediastream:`).
+

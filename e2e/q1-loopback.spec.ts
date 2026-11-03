@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 
 test("Q1: Loopback com conteúdo em movimento - teto permanece íntegro no valor configurado (modo Fixo)", async ({
   browser,

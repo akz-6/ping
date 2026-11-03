@@ -2,8 +2,14 @@ import { expect, test } from "@playwright/test";
 
 test.describe("lobby", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?demo=1");
     await expect(page.locator(".room-card:not(.is-skeleton)").first()).toBeVisible();
+  });
+
+  test("lobby inicial sem parâmetros de demonstração inicia limpo sem salas fake", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText("Nenhuma sala por aqui ainda")).toBeVisible();
+    await expect(page.locator(".room-card")).toHaveCount(0);
   });
 
   test("lista salas abertas e fechadas com contador n / 2", async ({ page }) => {
@@ -155,7 +161,7 @@ test.describe("lobby", () => {
 test.describe("responsivo", () => {
   test("mobile: bottom nav, sem sidebar, anúncio a cada 4 cards", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/");
+    await page.goto("/?demo=1");
     await expect(page.locator(".room-card:not(.is-skeleton)").first()).toBeVisible();
     await expect(page.locator(".bottom-nav")).toBeVisible();
     await expect(page.locator(".sidebar")).toBeHidden();
@@ -163,7 +169,7 @@ test.describe("responsivo", () => {
 
   test("tablet: mini-dock de 72px e anúncio abaixo do feed", async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto("/");
+    await page.goto("/?demo=1");
     await expect(page.locator(".room-card:not(.is-skeleton)").first()).toBeVisible();
     await expect(page.locator(".ads-right")).toBeHidden();
     await expect(page.locator(".ads-below")).toBeVisible();

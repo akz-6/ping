@@ -1,4 +1,4 @@
-/* Compatibilidade: telas legadas (host e viewer) usam nomes antigos mapeados para os tokens. */
+﻿/* Compatibilidade: telas legadas (host e viewer) usam nomes antigos mapeados para os tokens. */
 .legacy {
   --panel: var(--card);
   --panel-2: var(--bg);

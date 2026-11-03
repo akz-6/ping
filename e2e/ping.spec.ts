@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 
 test("fluxo ponta a ponta: host inicia, reinicia sem recarregar e transmite para viewer", async ({
   browser,

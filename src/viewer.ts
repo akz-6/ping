@@ -1,4 +1,4 @@
-import { Peer, type DataConnection, type MediaConnection } from "peerjs";
+﻿import { Peer, type DataConnection, type MediaConnection } from "peerjs";
 import {
   CONNECT_TIMEOUT_MS,
   hasTurn,

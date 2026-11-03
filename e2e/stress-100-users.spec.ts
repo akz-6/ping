@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect } from "@playwright/test";
 import { MockRoomService, MAX_OPEN_ROOMS } from "../src/app/services/rooms";
 import { derivePasswordHash, generateSaltHex } from "../src/app/services/supabase";
 
