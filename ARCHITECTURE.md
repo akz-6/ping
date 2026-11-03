@@ -47,7 +47,7 @@ Três planos independentes:
    - O `BitrateAdapter` opera em dois modos: **Fixo** (padrão, recomendado — o teto configurado pelo anfitrião nunca é reduzido automaticamente) e **Adaptativo** (opcional — reduz o teto somente sob evidência real de congestionamento de rede física mantida por $\ge 8\text{ s}$: `availableOutgoingBitrate < 90%` do teto, perda de pacotes $> 5\%$ ou RTT $> 3\times$ a linha de base).
    - O motivo `qualityLimitationReason = "bandwidth"` isolado **NUNCA** dispara redução de bitrate, eliminando o laço de realimentação onde o teto baixo forçava o encoder a reportar limitação interna de banda e reduzia o teto até 600 kbps. Limitação por CPU apenas orienta o usuário sem penalizar a banda.
    - Degradação cautelosa: passos de no máximo 15%, intervalo mínimo de 5 s entre reduções, respeitando piso seguro (40% do teto configurado e no mínimo 1.500 kbps para 720p+). Recuperação progressiva (+10% a cada 5 s) quando a rede estabilizar com banda disponível $> 120\%$ do teto e perda $< 1\%$. Ao reconectar, restaura o teto total imediatamente.
-   - **Gravadores de diagnóstico com buffer circular de 5 minutos** (300 amostras a 1 Hz) no anfitrião e no espectador, exportáveis em JSON via botões "Copiar diagnóstico (JSON)" para depuração técnica precisa sem envio a terceiros.
+   - **Gravadores de diagnóstico com buffer circular de 5 minutos** (300 amostras a 1 Hz) no anfitrião e no espectador, exportáveis em JSON via botões "Copiar diagnóstico (JSON)" para depuração técnica precisa sem envio a terceiros (histórico documentado em [DIAGNOSTICS.md](file:///d:/Ping/ping-projeto/ping/DIAGNOSTICS.md)).
 8. **ICE com STUN público + TURN configurável por variável de ambiente.** Sem TURN, cerca de 10 a 20% das conexões (NAT simétrico, CGNAT, redes corporativas) falham.
 
 ## 3. Fluxos
@@ -96,6 +96,7 @@ ping/
 ├── vercel.json
 ├── .env.example
 ├── ARCHITECTURE.md
+├── DIAGNOSTICS.md
 ├── SUPERPROMPT.md
 ├── public/
 │   ├── icon.svg             # ícone vetorial original do app
