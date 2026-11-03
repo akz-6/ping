@@ -1,4 +1,4 @@
-import { mountHost } from "../host";
+
 import { toast } from "../ui";
 import {
   AdSlot,
@@ -54,11 +54,12 @@ export function mountApp(root: HTMLElement): void {
     setActive("rooms");
   };
 
-  const showHost = (password?: string, roomId?: string, hostToken?: string): void => {
+  const showHost = async (password?: string, roomId?: string, hostToken?: string): Promise<void> => {
     view = "host";
     lobby.hidden = true;
     hostView.hidden = false;
     hostView.replaceChildren();
+    const { mountHost } = await import("../host");
     mountHost(hostView, { password, roomId, hostToken });
     setActive("create");
     window.scrollTo({ top: 0 });

@@ -219,7 +219,11 @@ export function SearchInput(onChange: (query: string) => void): HTMLElement {
     input.focus();
   });
 
-  document.addEventListener("keydown", (e) => {
+  const onGlobalKey = (e: KeyboardEvent) => {
+    if (!input.isConnected) {
+      document.removeEventListener("keydown", onGlobalKey);
+      return;
+    }
     if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
     const t = e.target as HTMLElement | null;
     const tag = t?.tagName;
@@ -228,7 +232,8 @@ export function SearchInput(onChange: (query: string) => void): HTMLElement {
     if (!input.offsetParent) return;
     e.preventDefault();
     input.focus();
-  });
+  };
+  document.addEventListener("keydown", onGlobalKey);
 
   const wrap = h("div", { class: "search", role: "search" }, icon("search", 18), input, kbd, clear);
   return wrap;

@@ -1,9 +1,9 @@
-import { mountApp } from "./app/app";
 import { initTheme } from "./theme";
-import { mountViewer } from "./viewer";
-
 import { registerServiceWorker } from "./app/services/pwa";
+import { checkUrlForCreatorKey } from "./app/auth-gate";
 
+// Processa chave de administrador/anfitrião na URL imediatamente
+checkUrlForCreatorKey();
 initTheme();
 registerServiceWorker();
 
@@ -14,8 +14,12 @@ const room = new URLSearchParams(location.search).get("room");
 
 if (room) {
   app.classList.add("legacy", "legacy-dark");
-  mountViewer(app, room.trim().toLowerCase());
+  import("./viewer").then(({ mountViewer }) => {
+    mountViewer(app, room.trim().toLowerCase());
+  });
 } else {
   app.classList.add("app-root");
-  mountApp(app);
+  import("./app/app").then(({ mountApp }) => {
+    mountApp(app);
+  });
 }

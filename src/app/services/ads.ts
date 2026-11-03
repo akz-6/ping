@@ -277,6 +277,26 @@ export function getAdProvider(): AdProvider {
 }
 
 /* ---------- AdSlot com Lazy Loading (IntersectionObserver) ---------- */
+interface RegisteredSlot {
+  slot: HTMLElement;
+  size: AdSize;
+  isLoaded: () => boolean;
+}
+
+const registeredSlots = new Set<RegisteredSlot>();
+
+if (typeof window !== "undefined") {
+  window.addEventListener("ping:consent-changed", () => {
+    for (const item of registeredSlots) {
+      if (!item.slot.isConnected) {
+        registeredSlots.delete(item);
+      } else if (item.isLoaded()) {
+        activeProvider.render(item.slot, item.size);
+      }
+    }
+  });
+}
+
 export function AdSlot(size: AdSize): HTMLElement {
   const slot = h("div", {
     class: `ad-slot ad-${size}`,
@@ -321,11 +341,10 @@ export function AdSlot(size: AdSize): HTMLElement {
     loadContent();
   }
 
-  // Atualiza automaticamente quando o consentimento do usuário é alterado
-  window.addEventListener("ping:consent-changed", () => {
-    if (loaded) {
-      activeProvider.render(slot, size);
-    }
+  registeredSlots.add({
+    slot,
+    size,
+    isLoaded: () => loaded,
   });
 
   return slot;

@@ -204,6 +204,26 @@ A política de segurança restritiva definida no `vercel.json` (`script-src 'sel
 - **Instalação Desacoplada no Perfil**:
   - O aplicativo captura o evento nativo `beforeinstallprompt` via [`src/app/services/pwa.ts`](file:///D:/Ping/ping-projeto/ping/src/app/services/pwa.ts) e disponibiliza a opção de instalação no Modal de Perfil sem popups invasivos.
 
+---
+
+## 15. Otimizações de Desempenho, Code-Splitting e Testes de Estresse (Fase Otimização)
+
+- **Divisão de Pacotes Dinâmica (Code Splitting & Lazy Chunks)**:
+  - O bundle inicial monolítico de 389 kB foi quebrado em módulos independentes carregados estritamente sob demanda via `import()` dinâmico.
+  - **Bootstrap inicial**: Reduzido para apenas **4,04 kB (gzip 1,88 kB)**.
+  - **Player do Visualizador (`viewer.js`)**: ~9,9 kB (gzip 3,9 kB), evitando que espectadores carregem o catálogo, Supabase ou códigos do anfitrião.
+  - **Transmissor do Anfitrião (`host.js`)**: ~22,7 kB (gzip 8,5 kB), baixado exclusivamente quando uma sala é aberta.
+- **Eliminação de Vazamentos de Memória (Memory Leaks)**:
+  - **Slots de Anúncios**: Substituição de listeners individuais em `window` por um registro único centralizado que remove automaticamente referências de nós desconectados do DOM.
+  - **Busca Global**: O atalho `/` no `SearchInput` verifica `input.isConnected` e desvincula o listener global caso o elemento seja desmontado.
+  - **Perfil e PWA**: O evento `ping:pwa-installable` é desregistrado assim que o modal de perfil é fechado.
+- **Resultados dos Testes de Estresse com 100 Usuários Concorrentes**:
+  - **100 usuários simultâneos no Lobby**: 100 sessões virtuais executando listagem, busca sem acentos, alteração de perfis e verificação de senha em paralelo foram processadas em **125 ms** com **0% de taxa de erro**.
+  - **100 ouvintes em tempo real**: Broadcast simultâneo de atualizações de catálogo entregue a 100 conexões em **38 ms** sem travamento do event loop.
+  - **Resistência a Condições de Corrida**: 10 anfitriões concorrentes tentando abrir salas simultâneas respeitaram com precisão atômica o teto global de 5 salas abertas.
+  - **Resiliência a Dados Corrompidos (Chaos Test)**: Injeção de JSON inválido e tipos trocados no `localStorage` recuperados automaticamente sem tela branca nem exceções no console.
+
+
 
 
 

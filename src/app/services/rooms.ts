@@ -81,6 +81,11 @@ export class MockRoomService implements RoomService {
     await new Promise((r) => setTimeout(r, this.latencyMs));
     const st = this.attempts.get(roomId) ?? { used: 0, lockedUntil: 0 };
     const now = Date.now();
+    if (st.lockedUntil > 0 && st.lockedUntil <= now) {
+      st.used = 0;
+      st.lockedUntil = 0;
+      this.attempts.delete(roomId);
+    }
     if (st.lockedUntil > now) {
       return { ok: false, attemptsLeft: 0, lockedMs: st.lockedUntil - now };
     }

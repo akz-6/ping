@@ -338,9 +338,10 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
 
   const pwaBtn = Button("Instalar aplicativo (PWA)", { variant: "secondary", block: true });
   pwaBtn.hidden = !isPwaInstallable();
-  window.addEventListener("ping:pwa-installable", () => {
+  const onInstallable = () => {
     pwaBtn.hidden = false;
-  });
+  };
+  window.addEventListener("ping:pwa-installable", onInstallable);
   pwaBtn.addEventListener("click", async () => {
     const installed = await promptPwaInstall();
     if (installed) {
@@ -366,6 +367,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
   const dlg = openDialog({ title: "Seu perfil", body: [body] });
 
   close.addEventListener("click", () => dlg.close());
+  dlg.el.addEventListener("close", () => window.removeEventListener("ping:pwa-installable", onInstallable));
 
   save.addEventListener("click", () => {
     const updated = saveProfile({
