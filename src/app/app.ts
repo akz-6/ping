@@ -15,6 +15,7 @@ import {
 import { h, normalize } from "./dom";
 import { getHandle } from "./identity";
 import { openCreateRoomModal, openPasswordModal, openProfileModal } from "./modals";
+import { isCreatorAuthorized, openTestingNoticeModal } from "./auth-gate";
 import { MAX_OPEN_ROOMS, createRoomService, type Room } from "./services/rooms";
 import { isSupabaseConfigured } from "./services/supabase";
 
@@ -63,6 +64,15 @@ export function mountApp(root: HTMLElement): void {
   };
 
   const onCreate = (): void => {
+    if (!isCreatorAuthorized()) {
+      openTestingNoticeModal({
+        onAuthorized: () => {
+          toast("Máquina autorizada com sucesso!");
+          onCreate();
+        },
+      });
+      return;
+    }
     openCreateRoomModal({
       openCount,
       onCreate: async (name, password) => {
@@ -208,5 +218,16 @@ export function mountApp(root: HTMLElement): void {
   setActive("rooms");
   void load();
 
-  if (new URLSearchParams(location.search).get("host") === "1") showHost("");
+  if (new URLSearchParams(location.search).get("host") === "1") {
+    if (isCreatorAuthorized()) {
+      showHost("");
+    } else {
+      openTestingNoticeModal({
+        onAuthorized: () => {
+          toast("Máquina autorizada com sucesso!");
+          showHost("");
+        },
+      });
+    }
+  }
 }

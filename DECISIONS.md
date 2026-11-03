@@ -123,3 +123,14 @@ A política de segurança restritiva definida no `vercel.json` (`script-src 'sel
 - **Derivação de Senha PBKDF2**: Implementada nativamente com `crypto.subtle` (SHA-256 com 100.000 iterações e sal de 128 bits gerado por entropia criptográfica).
 - **Resiliência e Fallback Transparente**: Se `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` não forem configurados no ambiente, o sistema utiliza o `MockRoomService` local com dados de demonstração sem quebrar a execução.
 
+---
+
+## 10. Trava de Criação de Salas (Fase Fechada de Testes)
+
+- **Proteção de Criação**: Máquinas de visitantes externos que tentarem criar salas (via sidebar, bottom nav móvel ou rota direta `/?host=1`) recebem um modal informando: *"A criação de novas salas está temporariamente indisponível. A plataforma Ping está em fase fechada de testes."*
+- **Autorização da Máquina do Anfitrião**:
+  - **Parâmetro de URL**: Abrir o Ping com `?admin=ping-master-2026` (ou chave personalizada via `VITE_CREATOR_KEY`) autoriza a máquina permanentemente no navegador (`localStorage`), limpando o parâmetro da barra de endereços sem recarregar.
+  - **Desbloqueio Manual**: O modal de aviso oferece a opção discreta *"Acesso do desenvolvedor / anfitrião"*, permitindo digitar a chave mestra para autorização imediata.
+  - **Ambiente Local**: Máquinas em `localhost` permanecem autorizadas nativamente para testes e desenvolvimento contínuo.
+
+
