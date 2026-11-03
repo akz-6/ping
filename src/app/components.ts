@@ -234,34 +234,16 @@ export function SearchInput(onChange: (query: string) => void): HTMLElement {
   return wrap;
 }
 
-/* ---------- AdSlot ---------- */
-export type AdSize = "300x250" | "300x600" | "320x100";
-
-/** Interface do provedor de anúncios. Conteúdo de terceiros deve ser isolado em iframe pela implementação real. */
-export interface AdProvider {
-  render(container: HTMLElement, size: AdSize): void;
-}
-
-export class PlaceholderAdProvider implements AdProvider {
-  render(container: HTMLElement, size: AdSize): void {
-    container.append(
-      h(
-        "div",
-        { class: "ad-placeholder" },
-        h("span", { class: "ad-overline" }, "Publicidade"),
-        h("span", { class: "ad-size" }, size.replace("x", " × ")),
-      ),
-    );
-  }
-}
-
-const adProvider: AdProvider = new PlaceholderAdProvider();
-
-export function AdSlot(size: AdSize): HTMLElement {
-  const slot = h("div", { class: `ad-slot ad-${size}` });
-  adProvider.render(slot, size);
-  return slot;
-}
+/* ---------- AdSlot (re-exportado do serviço especializado de anúncios) ---------- */
+export {
+  AdSlot,
+  type AdSize,
+  type AdProvider,
+  PlaceholderAdProvider,
+  DirectSponsorAdProvider,
+  setAdProvider,
+  getAdProvider,
+} from "./services/ads";
 
 /* ---------- Estados globais ---------- */
 export function Banner(

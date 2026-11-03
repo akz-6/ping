@@ -148,5 +148,49 @@ A política de segurança restritiva definida no `vercel.json` (`script-src 'sel
     1. **Sala Fechada (Exemplo)**: Exibe ocupação `2 / 5`. Ao digitar a senha de teste, exibe aviso: *"Esta é uma sala fake para teste."*
     2. **Sala Pública (Demonstração)**: Exibe status `5 / 5 Lotada`. Ao clicar para tentar entrar, notifica imediatamente: *"A sala está cheia (5 / 5 vagas ocupadas)."*
 
+---
+
+## 12. Anúncios, Consentimento LGPD e Monetização Responsável (Fase L4)
+
+- **Consentimento Prévio Obrigatório (LGPD)**:
+  - Nenhum anúncio ou script de terceiros é carregado antes do consentimento explícito do usuário.
+  - Banner flutuante no rodapé (`#ping-consent-banner`) com opções claras: *"Aceitar e apoiar"* (anúncios personalizados de patrocinadores) e *"Apenas essenciais"* (sem rastreadores ou publicidade invasiva).
+  - Preferência salva em `localStorage` (`ping:cookie_consent = "accepted" | "essential"`).
+  - O usuário pode alterar suas preferências a qualquer momento no Modal de Perfil (`openProfileModal`).
+- **Garantia de CLS Zero (Cumulative Layout Shift = 0)**:
+  - Os slots de anúncio têm dimensões estritamente fixas e reservadas no layout:
+    - `300×250` (topo da barra lateral desktop / rodapé de tablet).
+    - `300×600` (inferior da barra lateral desktop - formato skyscraper).
+    - `320×100` (banner mobile intercalado a cada 4 cartões de sala).
+- **Lazy Loading com `IntersectionObserver`**:
+  - Elementos publicitários só inicializam a renderização quando se aproximam do campo de visão do usuário (`rootMargin: "100px"`), economizando largura de banda e memória do dispositivo.
+- **Suporte a Patrocinadores Diretos (Direct Sponsors)**:
+  - Como alternativa sustentável e limpa a redes de anúncios programáticas pesadas, o Ping suporta criativos de patrocinadores diretos integrados ao design system.
+  - Links externos utilizam obrigatoriamente `target="_blank"` e `rel="sponsored noopener"`.
+  - Exibição de badge clara *"Patrocinado"* em conformidade com as diretrizes do CONAR / IAB.
+- **Isolamento Rígido de Rotas**:
+  - **Zero anúncios na transmissão**: Na rota de visualizador (`/?room=...`) ou durante uma transmissão ativa de host, nenhum elemento de anúncio ou banner é renderizado nem sobreposto aos controles de vídeo. Anúncios existem estritamente no Lobby.
+
+---
+
+## 13. Guia Operacional, Limites e Plano de Contingência
+
+- **Como Trocar Tema e Paleta**:
+  - No código: basta alterar os atributos no elemento raiz `html` (`data-theme="light|dark"` e `data-palette="indigo|teal|terracota"`).
+  - Na interface: o usuário altera em tempo real no Modal de Perfil, persistindo em `localStorage` e aplicando tokens CSS correspondentes sem piscar a tela.
+- **Como Rodar as Migrações do Supabase**:
+  - Conectar ao dashboard do Supabase do projeto.
+  - Abrir o **SQL Editor** e executar os scripts em ordem:
+    1. Criação das tabelas `rooms` e tabela espelho `rooms_public` com gatilhos de sincronização.
+    2. Funções RPC com `SECURITY DEFINER`: `create_room`, `heartbeat_room`, `update_viewers`, `verify_room_password`, `get_room_salt`.
+    3. Adição da tabela `rooms_public` à publicação `supabase_realtime`.
+- **Limites do Supabase Free Tier Observados**:
+  - *500 MB de banco de dados*: Suficiente para dezenas de milhares de registros de salas com lazy cleanup.
+  - *200 conexões simultâneas de Realtime*: Como as conexões de vídeo são 100% P2P entre navegadores e apenas o Lobby consome Postgres CDC, o plano suporta picos de usuários navegando sem custos adicionais.
+  - *Pausa por inatividade após 7 dias*: Mitigado por visitas periódicas ou acionamento programado.
+- **Plano de Contingência (Migração para Opção B)**:
+  - Caso o Supabase atinja cotas de uso do plano gratuito, a arquitetura permite alternar para a **Opção B (Vercel Functions + Upstash Redis)** apenas reimplementando a interface `RoomService` ([`src/app/services/rooms.ts`](file:///D:/Ping/ping-projeto/ping/src/app/services/rooms.ts)), sem precisar alterar nenhum componente de tela ou lógica de transmissão WebRTC do produto.
+
+
 
 

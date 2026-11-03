@@ -79,6 +79,13 @@ A interface do Ping foi redesenhada com base nas especificações do Figma (`MNx
 
 Consulte [`DECISIONS.md`](./DECISIONS.md) para o detalhamento completo dos tokens de design, acessibilidade e arquitetura.
 
+### Monetização Responsável e Privacidade LGPD (Fase L4)
+
+- **Consentimento Prévio**: O Ping implementa banner de consentimento (`ping:cookie_consent = "accepted" | "essential"`). Nenhum anúncio ou script de terceiros é carregado sem autorização do usuário.
+- **Patrocinadores Diretos**: Suporte a criativos estéticos e sustentáveis integrados ao design do app (links com `target="_blank"` e `rel="sponsored noopener"`).
+- **Sem Layout Shift (CLS = 0)**: Slots com dimensões reservadas (`300×250`, `300×600` e `320×100`) carregados via `IntersectionObserver`.
+- **Isolamento de Transmissão**: Zero anúncios na tela de transmissão ou sobreposição de controles de vídeo. Anúncios existem estritamente no Lobby.
+
 ### Configuração do Supabase (Backend Realtime - Fase L2)
 
 Para conectar o catálogo de salas e o Lobby a um banco Supabase em tempo real:

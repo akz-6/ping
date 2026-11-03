@@ -18,6 +18,7 @@ import { openCreateRoomModal, openPasswordModal, openProfileModal } from "./moda
 import { isCreatorAuthorized, openTestingNoticeModal } from "./auth-gate";
 import { MAX_OPEN_ROOMS, createRoomService, type Room } from "./services/rooms";
 import { isSupabaseConfigured } from "./services/supabase";
+import { getConsentStatus, openConsentBanner } from "./services/ads";
 
 type Status = "loading" | "ready" | "error";
 
@@ -61,6 +62,8 @@ export function mountApp(root: HTMLElement): void {
     mountHost(hostView, { password, roomId, hostToken });
     setActive("create");
     window.scrollTo({ top: 0 });
+    document.getElementById("ping-consent-banner")?.remove();
+    adsRight.hidden = true;
   };
 
   const onCreate = (): void => {
@@ -230,6 +233,11 @@ export function mountApp(root: HTMLElement): void {
   root.replaceChildren(h("div", { class: "app" }, sidebar.el, main, adsRight, bottom));
   setActive("rooms");
   void load();
+
+  const isHostParam = new URLSearchParams(location.search).get("host") === "1";
+  if (!isHostParam && getConsentStatus() === "prompt") {
+    openConsentBanner();
+  }
 
   if (new URLSearchParams(location.search).get("host") === "1") {
     if (isCreatorAuthorized()) {

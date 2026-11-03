@@ -19,6 +19,7 @@ import {
   type ThemeChoice,
 } from "../theme";
 import { toast } from "../ui";
+import { getConsentStatus, resetConsent, openConsentBanner } from "./services/ads";
 
 /* ---------- ModalCriarSala ---------- */
 export function openCreateRoomModal(opts: {
@@ -306,6 +307,34 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     setPalette,
   );
 
+  const privacyBox = h("div", { class: "profile-privacy-box" });
+  const consentSt = getConsentStatus();
+  privacyBox.append(
+    h("span", { class: "field-label" }, "Privacidade & Anúncios"),
+    h(
+      "div",
+      { class: "profile-privacy-row" },
+      h(
+        "span",
+        { class: "profile-privacy-text" },
+        consentSt === "accepted" ? "Anúncios permitidos (apoia a plataforma)" : "Apenas itens essenciais",
+      ),
+      h(
+        "button",
+        {
+          type: "button",
+          class: "btn btn-secondary btn-sm",
+          onClick: () => {
+            dlg.close();
+            resetConsent();
+            openConsentBanner();
+          },
+        },
+        "Gerenciar preferências",
+      ),
+    ),
+  );
+
   const body = h("div", { class: "dialog-form" });
   append(body, [
     header,
@@ -315,6 +344,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     note,
     appearance,
     palette,
+    privacyBox,
     h("div", { class: "dialog-actions" }, resetBtn, close, save),
   ]);
 
