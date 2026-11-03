@@ -1,3 +1,6 @@
+import { ROOM_PREFIX } from "../../config";
+import { shortId } from "../../ui";
+
 export interface Room {
   id: string;
   name: string;
@@ -8,7 +11,7 @@ export interface Room {
   hostToken?: string;
 }
 
-export const MAX_OPEN_ROOMS = 5;
+export const MAX_OPEN_ROOMS = 2;
 export const MAX_PASSWORD_ATTEMPTS = 3;
 
 export interface PasswordResult {
@@ -18,11 +21,18 @@ export interface PasswordResult {
   lockedMs?: number;
 }
 
+export interface CreateRoomInput {
+  name: string;
+  password?: string;
+  host: string;
+  isOwner?: boolean;
+}
+
 /** Contrato do catálogo de salas. A implementação real (Supabase, fase L2) entra no lugar do mock. */
 export interface RoomService {
   list(): Promise<Room[]>;
   subscribe(cb: (rooms: Room[]) => void): () => void;
-  create(input: { name: string; password: string; host: string }): Promise<Room>;
+  create(input: CreateRoomInput): Promise<Room>;
   verifyPassword(roomId: string, password: string): Promise<PasswordResult>;
 }
 
@@ -35,8 +45,8 @@ export class RoomLimitError extends Error {
 /** Dados simulados (flag VITE_MOCK_ROOMS, ligada por padrão até o backend existir). Senha das salas fechadas de demonstração: "demo". */
 export class MockRoomService implements RoomService {
   private rooms: Room[] = [
-    { id: "demo-publica-lotada", name: "Sala Pública (Demonstração)", host: "Sistema", isPrivate: false, viewers: 5, capacity: 5 },
-    { id: "demo-fechada-teste", name: "Sala Fechada (Exemplo)", host: "Moderador", isPrivate: true, viewers: 2, capacity: 5 },
+    { id: "demo-publica-lotada", name: "Sala Pública (Demonstração)", host: "Sistema", isPrivate: false, viewers: 2, capacity: 2 },
+    { id: "demo-fechada-teste", name: "Sala Fechada (Exemplo)", host: "Moderador", isPrivate: true, viewers: 1, capacity: 2 },
   ];
   private listeners = new Set<(rooms: Room[]) => void>();
   private attempts = new Map<string, { used: number; lockedUntil: number }>();
@@ -58,19 +68,22 @@ export class MockRoomService implements RoomService {
     return () => this.listeners.delete(cb);
   }
 
-  async create(input: { name: string; password: string; host: string }): Promise<Room> {
+  async create(input: CreateRoomInput): Promise<Room> {
     await new Promise((r) => setTimeout(r, this.latencyMs));
     const isPrivate = Boolean(input.password && input.password.length > 0);
-    if (!isPrivate && this.rooms.filter((r) => !r.isPrivate).length >= MAX_OPEN_ROOMS) {
+    const openRooms = this.rooms.filter((r) => !r.isPrivate).length;
+
+    // Se já tiver 2 salas abertas, somente o dono com a chave mestra (0604) pode criar
+    if (!isPrivate && !input.isOwner && openRooms >= MAX_OPEN_ROOMS) {
       throw new RoomLimitError();
     }
     const room: Room = {
-      id: `demo-${Date.now().toString(36)}`,
+      id: `${ROOM_PREFIX}${shortId(12)}`,
       name: input.name,
       host: input.host,
       isPrivate,
       viewers: 0,
-      capacity: 5,
+      capacity: 2,
     };
     this.rooms = [...this.rooms, room];
     this.emit();

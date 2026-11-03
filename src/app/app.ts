@@ -17,7 +17,6 @@ import { getHandle, getProfile } from "./identity";
 import { openCreateRoomModal, openPasswordModal, openProfileModal } from "./modals";
 import { isCreatorAuthorized, openTestingNoticeModal } from "./auth-gate";
 import { MAX_OPEN_ROOMS, createRoomService, type Room } from "./services/rooms";
-import { isSupabaseConfigured } from "./services/supabase";
 import { getConsentStatus, openConsentBanner } from "./services/ads";
 
 type Status = "loading" | "ready" | "error";
@@ -82,7 +81,22 @@ export function mountApp(root: HTMLElement): void {
   };
 
   const onCreate = (): void => {
-    if (!isCreatorAuthorized()) {
+    const isOwner = isCreatorAuthorized();
+    const currentOpen = openCount();
+
+    if (currentOpen >= MAX_OPEN_ROOMS && !isOwner) {
+      openTestingNoticeModal({
+        title: "Limite de Salas Atingido",
+        subtitle: `O limite de ${MAX_OPEN_ROOMS} salas abertas foi atingido. Somente o dono/anfitrião com a senha mestra pode criar novas salas.`,
+        onAuthorized: () => {
+          toast("Dono autenticado com sucesso!");
+          onCreate();
+        },
+      });
+      return;
+    }
+
+    if (!isOwner) {
       openTestingNoticeModal({
         onAuthorized: () => {
           toast("Máquina autorizada com sucesso!");
@@ -93,8 +107,9 @@ export function mountApp(root: HTMLElement): void {
     }
     openCreateRoomModal({
       openCount,
+      isOwner,
       onCreate: async (name, password) => {
-        const created = await service.create({ name, password, host: handle });
+        const created = await service.create({ name, password, host: handle, isOwner });
         showHost(password, created.id, created.hostToken);
       },
     });
@@ -102,7 +117,7 @@ export function mountApp(root: HTMLElement): void {
 
   const onSelect = (room: Room): void => {
     if (room.viewers >= room.capacity) {
-      toast(`A sala "${room.name}" está cheia (5 / 5 vagas ocupadas).`, "info");
+      toast(`A sala "${room.name}" está cheia (${room.capacity} / ${room.capacity} vagas ocupadas).`, "info");
       return;
     }
 
@@ -115,7 +130,7 @@ export function mountApp(root: HTMLElement): void {
         room,
         verify: (pw) => service.verifyPassword(room.id, pw),
         onSuccess: () => {
-          if (room.id === "demo-fechada-teste" || !isSupabaseConfigured()) {
+          if (room.id === "demo-fechada-teste") {
             toast("Senha correta. Esta é uma sala fake para teste.", "info");
           } else {
             toast("Senha correta. Conectando à sala...");
@@ -124,7 +139,7 @@ export function mountApp(root: HTMLElement): void {
         },
       });
     } else {
-      if (room.id === "demo-publica-lotada" || !isSupabaseConfigured()) {
+      if (room.id === "demo-publica-lotada") {
         toast(`A sala "${room.name}" é uma sala de demonstração.`);
       } else {
         enter();

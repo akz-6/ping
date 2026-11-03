@@ -6,13 +6,13 @@ test.describe("lobby", () => {
     await expect(page.locator(".room-card:not(.is-skeleton)").first()).toBeVisible();
   });
 
-  test("lista salas abertas e fechadas com contador n / 5", async ({ page }) => {
+  test("lista salas abertas e fechadas com contador n / 2", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Salas Abertas" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Salas Fechadas" })).toBeVisible();
-    await expect(page.locator(".chip")).toHaveText("1 / 5");
+    await expect(page.locator(".chip")).toHaveText("1 / 2");
     await expect(page.locator(".room-card")).toHaveCount(2);
-    await expect(page.getByRole("button", { name: /Sala aberta, 5 de 5 vagas, lotada/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Sala fechada, 2 de 5 vagas/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Sala aberta, 2 de 2 vagas, lotada/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Sala fechada, 1 de 2 vagas/ })).toBeVisible();
   });
 
   test("sala lotada fica focável e avisa que está cheia ao tentar entrar", async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe("lobby", () => {
     await expect(page.locator(".room-card")).toHaveCount(2);
   });
 
-  test("modal Criar Sala: nome obrigatório e limite de 5 salas abertas", async ({ page }) => {
+  test("modal Criar Sala: nome obrigatório e limite de 2 salas abertas", async ({ page }) => {
     const open = async () => {
       await page.locator("#sidebar-create").click();
       await expect(page.getByRole("dialog")).toBeVisible();
@@ -47,18 +47,15 @@ test.describe("lobby", () => {
     await page.getByRole("button", { name: "Criar Sala" }).last().click();
     await expect(page.getByText("Informe o nome da sala.")).toBeVisible();
 
-    // 1 aberta existente + 4 criadas = 5
-    for (const n of ["Sala A", "Sala B", "Sala C", "Sala D"]) {
-      await page.getByLabel("Nome da sala *").fill(n);
-      await page.getByRole("button", { name: "Criar Sala" }).last().click();
-      await expect(page.locator("#start")).toBeVisible();
-      await open();
-    }
+    // 1 aberta existente + 1 criada = 2
+    await page.getByLabel("Nome da sala *").fill("Sala A");
+    await page.getByRole("button", { name: "Criar Sala" }).last().click();
+    await expect(page.locator("#start")).toBeVisible();
+    await open();
 
     const dlg = page.getByRole("dialog");
-    await expect(dlg.getByText(/Limite de 5 salas abertas atingido/).first()).toBeVisible();
-    await page.getByLabel("Nome da sala *").fill("Sala E");
-    await expect(dlg.getByRole("button", { name: "Criar Sala" })).toBeDisabled();
+    await expect(dlg.getByText(/Limite de 2 salas abertas atingido/).first()).toBeVisible();
+    await page.getByLabel("Nome da sala *").fill("Sala B");
     await page.getByLabel("Senha (opcional)").fill("segredo");
     await expect(dlg.getByRole("button", { name: "Criar Sala" })).toBeEnabled();
     await dlg.getByRole("button", { name: "Criar Sala" }).click();
@@ -179,13 +176,14 @@ test("serviço de salas (mock): limite global e bloqueio por tentativas", async 
   const initial = await s.list();
   expect(initial).toHaveLength(2);
 
-  // 1 aberta inicial + 4 criadas = 5
+  // 1 aberta inicial + 1 criada = 2
   await s.create({ name: "A", host: "u" });
-  await s.create({ name: "B", host: "u" });
-  await s.create({ name: "C", host: "u" });
-  await s.create({ name: "D", host: "u" });
 
-  await expect(s.create({ name: "E", host: "u" })).rejects.toBeInstanceOf(RoomLimitError);
+  await expect(s.create({ name: "B", host: "u" })).rejects.toBeInstanceOf(RoomLimitError);
+
+  // O dono com chave mestra pode criar mesmo além do limite
+  const ownerRoom = await s.create({ name: "B-Owner", host: "u", isOwner: true });
+  expect(ownerRoom.id).toBeTruthy();
 
   // Fechada pode ser criada além do limite
   const priv = await s.create({ name: "F", password: "p", host: "u" });

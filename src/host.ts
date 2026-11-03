@@ -32,7 +32,7 @@ import { startHostLifecycle, type HostLifecycleHandle } from "./app/services/sup
 
 const STORAGE_UPLOAD_KEY = "ping_upload_mbps";
 const DEFAULT_UPLOAD_MBPS = 50;
-const DEFAULT_MAX_VIEWERS = 5;
+const DEFAULT_MAX_VIEWERS = 2;
 const MAX_PW_ATTEMPTS = 3;
 const PW_FAILURE_DELAY_MS = 1200;
 
@@ -156,7 +156,7 @@ const TEMPLATE = `
           <input type="number" id="upload-mbps" min="1" max="10000" step="1" value="50" />
         </label>
         <label>Máximo de espectadores
-          <input type="number" id="max-viewers" min="1" max="50" step="1" value="5" />
+          <input type="number" id="max-viewers" min="1" max="2" step="1" value="2" />
         </label>
         <label>Senha da sala (opcional)
           <input type="password" id="room-password" placeholder="Em branco = sem senha" autocomplete="off" />
@@ -583,7 +583,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   } => {
     const rawMax = Number(maxViewersInput.value);
     const maxViewers =
-      Number.isInteger(rawMax) && rawMax >= 1 && rawMax <= 50
+      Number.isInteger(rawMax) && rawMax >= 1 && rawMax <= 2
         ? rawMax
         : DEFAULT_MAX_VIEWERS;
     const bitrateModeSelect = root.querySelector<HTMLSelectElement>("#bitrate-mode");

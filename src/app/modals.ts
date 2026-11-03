@@ -25,6 +25,7 @@ import { isPwaInstallable, promptPwaInstall } from "./services/pwa";
 /* ---------- ModalCriarSala ---------- */
 export function openCreateRoomModal(opts: {
   openCount: () => number;
+  isOwner?: boolean;
   onCreate: (name: string, password: string) => Promise<void>;
 }): void {
   const name = Field({ label: "Nome da sala *", placeholder: "Ex.: Café da manhã", maxLength: 40 });
@@ -56,7 +57,7 @@ export function openCreateRoomModal(opts: {
 
   const dlg = openDialog({
     title: "Criar sala",
-    subtitle: "Crie um espaço para conversar com outras pessoas.",
+    subtitle: "Crie uma sala para transmissão de tela (máximo 2 pessoas).",
     body: [form],
     onClose: () => {
       pass.input.value = "";

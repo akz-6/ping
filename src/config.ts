@@ -3,7 +3,7 @@ import { Peer } from "peerjs";
 type PeerOptions = NonNullable<ConstructorParameters<typeof Peer>[1]>;
 
 export const ROOM_PREFIX = "ping-";
-export const ROOM_PATTERN = /^ping-[a-z0-9]{6,20}$/;
+export const ROOM_PATTERN = /^(ping-|demo-)[a-z0-9_-]{4,30}$/;
 export const CONNECT_TIMEOUT_MS = 15_000;
 
 const env = import.meta.env;

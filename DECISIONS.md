@@ -358,3 +358,20 @@ Para oferecer paridade completa com a experiência de transmissão de tela do Di
     3. Senha de salas de demonstração privadas aceitando também `"0604"` além de `"demo"`.
   - Compatibilidade com testes legados preservada, permitindo ambas as chaves sem regressão.
   - Novos testes automatizados adicionados em `e2e/auth-gate.spec.ts` validando o desbloqueio por URL e por modal com a chave `0604`.
+
+
+---
+
+## 22. Transmissão Real em Produção, Capacidade de 2 Pessoas e Regra de Dono com Senha Mestra
+
+- **Correção de Links de Transmissão (Fim do "Link Inválido" e "demo-")**:
+  - `ROOM_PREFIX` e `shortId(12)` padronizados na criação de novas salas em `MockRoomService.create()`, gerando links reais com padrão `ping-[id]` (ex.: `ping-a1b2c3d4e5f6`), eliminando prefixos falsos `demo-` dos links compartilhados.
+  - Expressão regular `ROOM_PATTERN` em `src/config.ts` ampliada para `/^(ping-|demo-)[a-z0-9_-]{4,30}$/`, garantindo compatibilidade reversa imediata com qualquer link pré-existente sem acusar "Link inválido".
+  - Entrada real de transmissão habilitada no Lobby (`app.ts`): clicar em salas criadas executa diretamente a navegação e montagem do visualizador WebRTC sem travamentos por toasts de demonstração.
+- **Capacidade Reduzida para no Máximo 2 Pessoas (`capacity = 2`)**:
+  - `capacity` padronizado para 2 participantes (host + visualizador) nos serviços de sala (`rooms.ts` e `supabase.ts`).
+  - No anfitrião (`src/host.ts`), limite padrão e máximo de espectadores (`DEFAULT_MAX_VIEWERS` e `#max-viewers`) configurado estritamente para `2`.
+- **Regra de Criação de Sala Restrita ao Dono (`0604`) após 2 Salas**:
+  - `MAX_OPEN_ROOMS` ajustado para `2`.
+  - Ao atingir 2 salas abertas, o sistema bloqueia criações não autenticadas e exige a chave mestra (`0604`).
+  - O dono ("eu"), autenticado com a chave mestra (`isOwner: true`), tem permissão irrestrita para criar e gerenciar salas na plataforma.

@@ -75,7 +75,11 @@ export function authorizeCreator(candidate: string): boolean {
   return false;
 }
 
-export function openTestingNoticeModal(opts: { onAuthorized: () => void }): void {
+export function openTestingNoticeModal(opts: {
+  onAuthorized: () => void;
+  title?: string;
+  subtitle?: string;
+}): void {
   const dismissBtn = Button("Entendido", { variant: "primary", block: true });
 
   const unlockLink = h(
@@ -95,7 +99,7 @@ export function openTestingNoticeModal(opts: { onAuthorized: () => void }): void
 
   const unlockInput = Field({
     label: "Chave de acesso",
-    placeholder: "Digite a chave do anfitrião",
+    placeholder: "Digite a chave do anfitrião (0604)",
   });
   unlockInput.input.type = "password";
 
@@ -103,14 +107,16 @@ export function openTestingNoticeModal(opts: { onAuthorized: () => void }): void
 
   const unlockSection = h(
     "div",
-    { class: "testing-unlock-box", hidden: true },
+    { class: "testing-unlock-box", hidden: !opts.title },
     unlockInput.el,
     confirmUnlockBtn,
   );
 
   const dlg = openDialog({
-    title: "Criação Indisponível",
-    subtitle: "A criação de novas salas está temporariamente indisponível. A plataforma Ping está em fase fechada de testes.",
+    title: opts.title || "Criação Indisponível",
+    subtitle:
+      opts.subtitle ||
+      "A criação de novas salas está temporariamente indisponível. A plataforma Ping está em fase fechada de testes.",
     body: [
       h(
         "div",

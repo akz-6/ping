@@ -93,7 +93,7 @@ export class SupabaseRoomService implements RoomService {
       host: row.host,
       isPrivate: row.is_private,
       viewers: row.viewers ?? 0,
-      capacity: row.capacity ?? 5,
+      capacity: row.capacity ?? 2,
     };
   }
 
@@ -179,7 +179,7 @@ export class SupabaseRoomService implements RoomService {
     };
   }
 
-  async create(input: { name: string; password?: string; host: string }): Promise<Room> {
+  async create(input: { name: string; password?: string; host: string; isOwner?: boolean }): Promise<Room> {
     const isPrivate = Boolean(input.password);
     let salt: string | null = null;
     let hash: string | null = null;
@@ -224,7 +224,7 @@ export class SupabaseRoomService implements RoomService {
       host: payload.host,
       isPrivate: payload.isPrivate,
       viewers: payload.viewers ?? 0,
-      capacity: payload.capacity ?? 5,
+      capacity: payload.capacity ?? 2,
       hostToken: payload.hostToken,
     };
   }
