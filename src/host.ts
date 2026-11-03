@@ -1,5 +1,5 @@
 import { Peer, type DataConnection, type MediaConnection } from "peerjs";
-import { CONNECT_TIMEOUT_MS, peerOptions, ROOM_PREFIX } from "./config";
+import { CONNECT_TIMEOUT_MS, hasTurn, peerOptions, ROOM_PREFIX } from "./config";
 import {
   applyCodecPreferences,
   BitrateAdapter,
@@ -159,6 +159,11 @@ const TEMPLATE = `
     </details>
 
     <label class="check"><input type="checkbox" id="audio" checked /> Capturar áudio do sistema ou da aba</label>
+    <div class="turn-hint ${hasTurn() ? "turn-ready" : "turn-missing"}" role="status">
+      ${hasTurn()
+        ? '<span>🛡️ <strong>TURN ativo:</strong> Conexões externas e redes móveis (4G/5G) habilitadas.</span>'
+        : '<span>⚠️ <strong>Aviso de Rede:</strong> TURN não configurado. Funciona na mesma rede/Wi-Fi. Conexões em 4G/5G ou CGNAT exigem servidor TURN.</span>'}
+    </div>
     <p class="warn" id="setup-capacity-warn" role="status" hidden></p>
     <button id="start" type="button" class="primary">Iniciar transmissão</button>
     <p class="warn" id="unsupported" hidden>Este navegador não consegue compartilhar a tela. Use Chrome, Edge ou Firefox no computador. Quem só assiste pode usar qualquer navegador.</p>

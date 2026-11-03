@@ -9,6 +9,7 @@ Este documento centraliza as capturas de telemetria diagnóstica reais coletadas
 | ID | Data / Hora (UTC) | Papel | Sala | Cliente | Amostras | Rede | Resumo do Cenário |
 |---|---|---|---|---|---|---|---|
 | [#001](#sessão-001--2026-11-03-005754-utc) | 2026-11-03 00:57:54 | Viewer | `ping-twbbipmscqyz` | `rbm5po7k` | 12 | Loopback / LAN (RTT 0-1 ms) | Transição tela estática para movimento com rampa conservadora de resolução do Chromium (360p -> 480p). |
+| [#002](#sessão--incidente-002--falha-de-conexão-em-dados-móveis-4g5g-e-redes-externas-ice-failed--cgnat) | 2026-11-02 22:26:00 | Viewer | N/A | Mobile / Amigo | N/A | Dados Móveis (4G/5G) e Redes Externas | Erro "ICE falhou (provável NAT/CGNAT). Peça ao anfitrião para configurar um servidor TURN." ao desconectar do Wi-Fi. |
 
 ---
 
@@ -305,6 +306,113 @@ Este documento centraliza as capturas de telemetria diagnóstica reais coletadas
 ```
 
 </details>
+
+---
+
+## Sessão / Incidente #002 – Falha de Conexão em Dados Móveis (4G/5G) e Redes Externas (ICE Failed / CGNAT)
+
+### 1. Metadados e Relato de Comportamento
+- **Papel:** Espectador (`viewer`) em dispositivo móvel (celular) e amigo em rede externa residencial/móvel.
+- **Data/Hora:** `2026-11-02T22:26:00Z`
+- **Comportamento Observado:**
+  1. **Mesmo Wi-Fi:** O celular conecta à sala do computador e assiste com perfeição, sem engasgos e com latência mínima.
+  2. **Dados Móveis (4G/5G):** Ao desligar o Wi-Fi do celular e usar a rede móvel, a tela do visualizador trava em tentativa de conexão e exibe o erro vermelho:
+     > `"ICE falhou (provável NAT/CGNAT). Peça ao anfitrião para configurar um servidor TURN."`
+  3. **Amigo Externo:** Ao testar de outro celular/residência pela internet, a conexão fica em loop infinito (*"só ficava conectando e não conectava"*) até esgotar o tempo limite de ICE.
+
+---
+
+### 2. Análise Técnica de Engenharia WebRTC e Causa Raiz
+
+#### A. Por que funciona perfeitamente no mesmo Wi-Fi?
+Quando o Host (computador) e o Viewer (celular) estão conectados no mesmo roteador/Wi-Fi:
+- O protocolo ICE coleta candidatos do tipo **`host`** (ex: `192.168.0.15` e `192.168.0.27`).
+- Esses endereços IP pertencem à mesma sub-rede privada local (LAN).
+- A comunicação de pacotes de vídeo e dados viaja diretamente pelo switch do roteador sem necessidade de tradução de endereço de rede (NAT) nem saída para a internet pública. O pareamento ICE é instantâneo.
+
+#### B. Por que falha no 4G/5G e com amigos fora de casa?
+Quando o celular está nos Dados Móveis (4G/5G) ou em outra operadora:
+1. **CGNAT (Carrier-Grade NAT, RFC 6598 - faixa `100.64.0.0/10`):** Operadoras de telefonia móvel (como Claro, Vivo, TIM no Brasil, e provedores de fibra com escassez de IPv4) não atribuem IPs públicos dedicados aos celulares. Milhares de celulares compartilham o mesmo IP público através de um NAT centralizado da operadora.
+2. **NAT Simétrico (Symmetric NAT):**
+   - No NAT Simétrico, quando o dispositivo faz uma requisição UDP para um destino $X$ (por exemplo, o servidor STUN do Google `stun.l.google.com:19302`), o roteador da operadora aloca uma porta pública $P_1$.
+   - O STUN descobre e informa o candidato reflexivo (`srflx`) com a porta $P_1$.
+   - Porém, quando o dispositivo tenta enviar mídia para o par $Y$ (o computador anfitrião), o NAT Simétrico aloca **outra porta completamente diferente** $P_2$.
+   - Como o anfitrião tenta enviar pacotes para a porta $P_1$ (informada pelo STUN), o firewall da operadora móvel descarta todos os pacotes UDP silenciosamente!
+3. **Ausência de Servidor de Retransmissão (TURN / Relay Candidates):**
+   - O protocolo STUN apenas descobre endereços externos; **STUN não faz perfuração em NAT Simétrico**.
+   - Para que o WebRTC funcione sob NAT Simétrico ou CGNAT duplo, a especificação WebRTC (RFC 5766 / RFC 5245) exige um servidor **TURN** (*Traversal Using Relays around NAT*).
+   - O servidor TURN possui IP público fixo e atua como ponte de tráfego (relé de pacotes SRTP criptografados de ponta a ponta).
+   - Como o Ping não possuía variáveis de ambiente `VITE_TURN_*` definidas, a lista de candidatos ICE continha apenas `host` e `srflx`. Sem candidatos `relay`, o pareamento esgotou as tentativas, o estado da conexão transitou para `iceConnectionState = "failed"` e o Ping disparou a mensagem de erro específica.
+
+---
+
+### 3. Soluções Definitivas para o Ping
+
+O código do Ping no arquivo [src/config.ts](file:///d:/Ping/ping-projeto/ping/src/config.ts) **já foi construído desde a Fase 1 para consumir credenciais TURN nativamente**. Se as variáveis `VITE_TURN_URLS`, `VITE_TURN_USERNAME` e `VITE_TURN_CREDENTIAL` existirem no build, o `iceServers()` automaticamente adiciona o TURN nas chamadas `RTCPeerConnection`.
+
+Abaixo estão as 3 melhores soluções práticas para habilitar o TURN:
+
+#### Opção 1: Metered Video (TURN em Nuvem Gratuito – Recomendada, Pronta em 3 min)
+A plataforma [Metered.ca](https://www.metered.ca/) fornece servidores TURN mundiais com camada gratuita permanente de **20 a 50 GB de tráfego por mês**, sem exigir cartão de crédito no cadastro. Oferece conexões nas portas 80 e 443 (UDP e TCP/TLS), contornando qualquer bloqueio de operadora ou firewall corporativo.
+
+**Passo a passo:**
+1. Crie uma conta gratuita em [https://dashboard.metered.ca/signup](https://dashboard.metered.ca/signup).
+2. No painel, clique em **TURN Server** e depois na aba **Credentials**.
+3. Copie as URLs fornecidas e as credenciais (`Username` e `Password` ou `API Key`).
+4. Adicione as 3 variáveis no arquivo local [d:\Ping\ping-projeto\ping\.env.local](file:///d:/Ping/ping-projeto/ping/.env.local):
+   ```env
+   VITE_TURN_URLS="turn:standard.relay.metered.ca:80,turn:standard.relay.metered.ca:443,turns:standard.relay.metered.ca:443?transport=tcp"
+   VITE_TURN_USERNAME="seu-username-aqui"
+   VITE_TURN_CREDENTIAL="sua-senha-aqui"
+   ```
+5. Adicione as mesmas variáveis no painel da Vercel:
+   - Acesse o projeto Ping na Vercel: `Settings` → `Environment Variables`.
+   - Adicione `VITE_TURN_URLS`, `VITE_TURN_USERNAME` e `VITE_TURN_CREDENTIAL` para os ambientes `Production` e `Preview`.
+6. Faça um novo deploy (`npx vercel deploy --prod`).
+   *Pronto! Automaticamente celulares em 4G/5G e amigos em qualquer rede passarão a conectar imediatamente sem falha de ICE.*
+
+#### Opção 2: Coturn em Servidor Próprio (100% Gratuito Ilimitado)
+Caso queira tráfego ilimitado sem depender de cotas mensais de terceiros, é possível subir o servidor open-source padrão da indústria, o **Coturn**, em uma VPS gratuita vitalícia da **Oracle Cloud Free Tier** (Always Free VM) ou VPS de baixo custo ($3 a $4/mês na Hetzner, DigitalOcean ou OVH):
+
+1. Instale o Coturn na máquina Linux com IP público:
+   ```bash
+   sudo apt update && sudo apt install -y coturn
+   ```
+2. Edite `/etc/turnserver.conf`:
+   ```ini
+   listening-port=3478
+   tls-listening-port=443
+   realm=ping.app
+   user=pinguser:SenhaSegura123
+   fingerprint
+   lt-cred-mech
+   # Faixa de portas para mídia UDP:
+   min-port=49152
+   max-port=65535
+   ```
+3. Abra as portas no firewall (`ufw allow 3478/tcp`, `ufw allow 3478/udp`, `ufw allow 443/tcp`, `ufw allow 49152:65535/udp`) e inicie o serviço:
+   ```bash
+   sudo systemctl restart coturn
+   ```
+4. Configure no Ping:
+   ```env
+   VITE_TURN_URLS="turn:ip-da-sua-vps:3478,turns:ip-da-sua-vps:443?transport=tcp"
+   VITE_TURN_USERNAME="pinguser"
+   VITE_TURN_CREDENTIAL="SenhaSegura123"
+   ```
+
+#### Opção 3: Cloudflare Calls / TURN Service
+A Cloudflare possui serviço TURN de altíssima velocidade em sua rede Anycast global. É possível gerar credenciais dinâmicas integrando com a infraestrutura da Cloudflare.
+
+---
+
+### 4. Melhorias de UX no Código do Ping para o Anfitrião
+
+Para que o usuário saiba antecipadamente se a sua sala suporta conexões externas e redes móveis:
+- **Indicador de Status do TURN no Setup do Host:** Exibir um selo no card de configuração inicial:
+  - Se `hasTurn() === true`: `🛡️ TURN Ativo (suporta 4G/5G e amigos externos)`.
+  - Se `hasTurn() === false`: `⚠️ TURN não configurado (ideal para mesma rede/Wi-Fi; 4G/5G pode exigir TURN)`.
+- **Orientação no Erro do Espectador:** Incluir botão ou link para o guia de configuração de TURN quando ocorrer falha de ICE, tornando o diagnóstico autoexplicativo.
 
 ---
 
