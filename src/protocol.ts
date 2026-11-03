@@ -10,6 +10,10 @@ export type ToHost =
   | {
       t: "quality-preset";
       preset: QualityPreset;
+    }
+  | {
+      t: "fps-cap";
+      fps: number;
     };
 
 export type DeniedReason =
@@ -23,7 +27,7 @@ export type ToViewer =
   | { t: "pending" }
   | { t: "approved" }
   | { t: "denied"; reason?: DeniedReason }
-  | { t: "welcome" }
+  | { t: "welcome"; maxFps?: number }
   | { t: "viewers"; n: number }
   | { t: "kicked" }
   | { t: "ended" }
@@ -68,6 +72,18 @@ export function parseToHost(data: unknown): ToHost | null {
     return null;
   }
 
+  if (data.t === "fps-cap") {
+    if (
+      typeof data.fps === "number" &&
+      Number.isFinite(data.fps) &&
+      data.fps >= 5 &&
+      data.fps <= 360
+    ) {
+      return { t: "fps-cap", fps: Math.round(data.fps) };
+    }
+    return null;
+  }
+
   return null;
 }
 
@@ -76,7 +92,19 @@ export function parseToViewer(data: unknown): ToViewer | null {
   if (!isPlainObject(data) || typeof data.t !== "string") return null;
 
   switch (data.t) {
-    case "welcome":
+    case "welcome": {
+      const out: ToViewer = { t: "welcome" };
+      if (
+        typeof data.maxFps === "number" &&
+        Number.isFinite(data.maxFps) &&
+        data.maxFps > 0 &&
+        data.maxFps <= 360
+      ) {
+        out.maxFps = Math.round(data.maxFps);
+      }
+      return out;
+    }
+
     case "pending":
     case "approved":
     case "kicked":

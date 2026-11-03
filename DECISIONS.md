@@ -297,6 +297,32 @@ Para oferecer paridade completa com a experiência de transmissão de tela do Di
 - **Cobertura de Testes Automatizados**:
   - Testes E2E ponta a ponta validando troca de opções no select, ciclograma via atalho `Q`, persistência no storage e adaptação real nos parâmetros de envio do anfitrião via diagnóstico WebRTC. Total de 51 testes automatizados cobrindo a suíte.
 
+---
+
+## 19. Opções Ampliadas de FPS para o Anfitrião (até 240 FPS) e Controle de FPS Dinâmico pelo Visualizador
+
+- **Opções de Taxa de Quadros no Anfitrião (Até 240 FPS)**:
+  - O seletor de FPS do host foi expandido para suportar setups gamers e monitores de alta taxa de atualização:
+    - **30 FPS**: Econômico / Básico.
+    - **60 FPS**: Padrão Fluido (recomendado).
+    - **120 FPS**: Ultra Gamer (monitores 120Hz/144Hz).
+    - **144 FPS**: Competitivo (e-sports).
+    - **240 FPS**: Extremo (monitores 240Hz+).
+  - A captura `navigator.mediaDevices.getDisplayMedia` recebe `{ frameRate: { ideal: fps, max: fps } }` nativamente.
+- **Controle Dinâmico de FPS pelo Espectador (`#fps-selector`)**:
+  - Ao ingressar na transmissão, o visualizador recebe a mensagem `{ t: "welcome", maxFps }` informando o teto máximo permitido pelo anfitrião.
+  - O seletor de FPS do espectador popula dinamicamente **apenas as opções que não ultrapassam o teto liberado pelo anfitrião**:
+    - Exemplo: se o host transmite a 120 FPS, o espectador pode escolher `Auto (120)`, `120 FPS`, `60 FPS`, `30 FPS` ou `15 FPS`.
+    - Se o host transmite a 60 FPS, opções de 120, 144 ou 240 FPS não aparecem para o espectador.
+- **Controle WebRTC por Peer (`maxFramerate`)**:
+  - Quando o espectador seleciona um valor de FPS menor (ex.: 30 FPS para poupar bateria ou dados), o visualizador envia `{ t: "fps-cap", fps: 30 }`.
+  - O anfitrião limita `params.encodings[0].maxFramerate = 30` no `RTCRtpSender` daquele visualizador.
+  - O navegador descarta frames extras na codificação daquele canal P2P específico, reduzindo instantaneamente consumo de CPU/GPU e tráfego de rede para o espectador, sem afetar quem assiste a 120 FPS.
+- **Estatísticas do Discord & OSD**:
+  - Exibição de notificação instantânea OSD (`FPS limitado a: X FPS`) e linha dedicada *"FPS Escolhido"* no painel flutuante de diagnóstico (`D`).
+- **Cobertura de Testes**:
+  - Teste E2E ponta a ponta Playwright validando a seleção de 120 FPS no host, filtragem estrita no visualizador, envio de comando de limitação a 30 FPS e verificação no diagnóstico técnico do anfitrião. Total de 52 testes automatizados aprovados com 100% de sucesso.
+
 
 
 

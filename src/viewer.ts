@@ -107,6 +107,10 @@ const TEMPLATE = `
           <span class="stat-label">Perfil Escolhido</span>
           <span class="stat-val" id="ds-preset">Auto (Original)</span>
         </div>
+        <div class="discord-stat-item">
+          <span class="stat-label">FPS Escolhido</span>
+          <span class="stat-val" id="ds-chosen-fps">Auto</span>
+        </div>
       </div>
     </div>
   </div>
@@ -130,6 +134,12 @@ const TEMPLATE = `
       <option value="720p">⚡ 720p (Rápido)</option>
       <option value="480p">🚀 480p (Mais Rápido)</option>
       <option value="360p">🔋 360p (Super Leve)</option>
+    </select>
+    <select id="fps-selector" class="viewer-quality-select" aria-label="Taxa de quadros máxima (FPS)" title="Escolher FPS desejado (limitado pelo anfitrião)">
+      <option value="auto">FPS: Auto</option>
+      <option value="60">60 FPS</option>
+      <option value="30">30 FPS</option>
+      <option value="15">15 FPS</option>
     </select>
     <span id="stats" class="stats" aria-live="off"></span>
     <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico da conexão em JSON">Diagnóstico</button>
@@ -207,6 +217,72 @@ export function mountViewer(root: HTMLElement, room: string): void {
   qualitySelect.addEventListener("change", () => {
     const val = qualitySelect.value as QualityPreset;
     setQualityPreset(val, true);
+    showBarTemporarily();
+  });
+
+  const fpsSelect = $<HTMLSelectElement>(root, "#fps-selector");
+  const dsChosenFps = $<HTMLElement>(root, "#ds-chosen-fps");
+  let hostMaxFps = 60;
+  let currentFpsChoice: string = "auto";
+  try {
+    const savedFps = localStorage.getItem("ping_viewer_fps");
+    if (savedFps) {
+      currentFpsChoice = savedFps;
+    }
+  } catch {
+    // ignore
+  }
+
+  const FPS_TIERS = [240, 144, 120, 60, 30, 15];
+
+  const updateFpsSelectorOptions = (maxFps: number): void => {
+    hostMaxFps = maxFps;
+    const allowedTiers = FPS_TIERS.filter((f) => f <= maxFps);
+    fpsSelect.replaceChildren();
+
+    const optAuto = document.createElement("option");
+    optAuto.value = "auto";
+    optAuto.textContent = `FPS: Auto (${maxFps})`;
+    fpsSelect.appendChild(optAuto);
+
+    for (const fps of allowedTiers) {
+      const opt = document.createElement("option");
+      opt.value = String(fps);
+      opt.textContent = `${fps} FPS`;
+      fpsSelect.appendChild(opt);
+    }
+
+    if (currentFpsChoice !== "auto" && Number(currentFpsChoice) <= maxFps) {
+      fpsSelect.value = currentFpsChoice;
+      dsChosenFps.textContent = `${currentFpsChoice} FPS`;
+    } else {
+      fpsSelect.value = "auto";
+      dsChosenFps.textContent = `Auto (${maxFps} FPS)`;
+    }
+  };
+
+  const setFpsChoice = (choice: string, notify = true): void => {
+    currentFpsChoice = choice;
+    fpsSelect.value = choice;
+    try {
+      localStorage.setItem("ping_viewer_fps", choice);
+    } catch {
+      // ignore
+    }
+
+    const targetFps = choice === "auto" ? hostMaxFps : Number(choice);
+    dsChosenFps.textContent = choice === "auto" ? `Auto (${hostMaxFps} FPS)` : `${choice} FPS`;
+
+    if (conn && conn.open) {
+      void conn.send({ t: "fps-cap", fps: targetFps } satisfies ToHost);
+    }
+    if (notify) {
+      showOsd(choice === "auto" ? `FPS: Auto (${hostMaxFps} FPS)` : `FPS limitado a: ${choice} FPS`);
+    }
+  };
+
+  fpsSelect.addEventListener("change", () => {
+    setFpsChoice(fpsSelect.value, true);
     showBarTemporarily();
   });
 
@@ -488,6 +564,9 @@ export function mountViewer(root: HTMLElement, room: string): void {
         if (currentPreset !== "source") {
           void c.send({ t: "quality-preset", preset: currentPreset } satisfies ToHost);
         }
+        if (currentFpsChoice !== "auto") {
+          void c.send({ t: "fps-cap", fps: Number(currentFpsChoice) } satisfies ToHost);
+        }
         if (!gotStream) {
           setStatus(
             reconnectAttempt > 0
@@ -533,8 +612,14 @@ export function mountViewer(root: HTMLElement, room: string): void {
           case "approved":
           case "welcome": {
             authWrap.hidden = true;
+            if (msg.t === "welcome" && typeof msg.maxFps === "number") {
+              updateFpsSelectorOptions(msg.maxFps);
+            }
             if (currentPreset !== "source" && conn && conn.open) {
               void conn.send({ t: "quality-preset", preset: currentPreset } satisfies ToHost);
+            }
+            if (currentFpsChoice !== "auto" && conn && conn.open) {
+              void conn.send({ t: "fps-cap", fps: Number(currentFpsChoice) } satisfies ToHost);
             }
             if (!gotStream) {
               setStatus("Aguardando o vídeo do anfitrião…", false);
@@ -999,6 +1084,8 @@ export function mountViewer(root: HTMLElement, room: string): void {
       roomId: room,
       clientId,
       qualityPreset: currentPreset,
+      chosenFps: currentFpsChoice,
+      hostMaxFps: hostMaxFps,
       samplesCount: diagnosticBuffer.length,
       samples: diagnosticBuffer.getAll(),
     };

@@ -259,4 +259,66 @@ test.describe("Polimento Frontend & Pontas Soltas", () => {
     await hostContext.close();
     await viewerContext.close();
   });
+
+  test("anfitrião possui opções ampliadas de FPS (até 240) e espectador escolhe FPS limitado ao que o anfitrião liberou", async ({ browser }) => {
+    const hostContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+    const viewerContext = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+
+    const hostPage = await hostContext.newPage();
+    const viewerPage = await viewerContext.newPage();
+
+    // 1. Host abre e verifica opções ampliadas de FPS (30, 60, 120, 144, 240)
+    await hostPage.goto("/?host=1&admin=ping-master-2026");
+    const fpsHostSelect = hostPage.locator("#fps");
+    await expect(fpsHostSelect).toBeVisible();
+
+    const fpsOptions = await fpsHostSelect.locator("option").allTextContents();
+    expect(fpsOptions).toEqual(expect.arrayContaining(["30 FPS", "60 FPS (Padrão)", "120 FPS (Ultra Gamer)", "144 FPS (Competitivo)", "240 FPS (Extremo)"]));
+
+    // Seleciona 120 FPS e inicia live
+    await fpsHostSelect.selectOption("120");
+    await hostPage.locator("#start").click();
+    await expect(hostPage.locator("#live")).toBeVisible({ timeout: 15_000 });
+    const roomLink = await hostPage.locator("#link").inputValue();
+
+    // 2. Viewer conecta na sala
+    await viewerPage.goto(roomLink);
+    await expect(viewerPage.locator("#bar")).toBeVisible({ timeout: 20_000 });
+
+    const fpsViewerSelect = viewerPage.locator("#fps-selector");
+    await expect(fpsViewerSelect).toBeVisible();
+
+    // Verifica que o viewer recebeu as opções limitadas ao teto liberado pelo anfitrião (120)
+    const viewerOptions = await fpsViewerSelect.locator("option").allTextContents();
+    expect(viewerOptions).toContain("FPS: Auto (120)");
+    expect(viewerOptions).toContain("120 FPS");
+    expect(viewerOptions).toContain("60 FPS");
+    expect(viewerOptions).toContain("30 FPS");
+    expect(viewerOptions).toContain("15 FPS");
+    // Não deve conter 144 nem 240 pois o host só liberou 120
+    expect(viewerOptions).not.toContain("144 FPS");
+    expect(viewerOptions).not.toContain("240 FPS");
+
+    // 3. Visualizador escolhe 30 FPS para economizar hardware/rede
+    await fpsViewerSelect.selectOption("30");
+    await expect(viewerPage.locator("#osd")).toHaveText(/FPS limitado a: 30 FPS/);
+
+    // Valida no Discord Stats Modal
+    await viewerPage.locator("#quality").click();
+    await expect(viewerPage.locator("#discord-stats-modal")).toBeVisible();
+    await expect(viewerPage.locator("#ds-chosen-fps")).toHaveText("30 FPS");
+
+    // 4. Host verifica que o limite personalizado de FPS do visualizador foi aplicado
+    await hostPage.bringToFront();
+    await hostPage.locator("#copy-diag").click({ force: true });
+    const hostDiag = await hostPage.evaluate(() => (window as any).__pingLastDiag);
+
+    expect(hostDiag).toBeTruthy();
+    expect(hostDiag.settings.fps).toBe(120);
+    expect(hostDiag.viewers.length).toBeGreaterThan(0);
+    expect(hostDiag.viewers[0].customFps).toBe(30);
+
+    await hostContext.close();
+    await viewerContext.close();
+  });
 });

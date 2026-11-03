@@ -46,6 +46,7 @@ interface ViewerEntry {
   lastStats: SenderStatsSample | null;
   diagnosticBuffer: CircularBuffer<HostDiagnosticSample>;
   qualityPreset?: QualityPreset;
+  customFps?: number;
   cleanup: () => void;
 }
 
@@ -104,7 +105,10 @@ const TEMPLATE = `
       <label>Taxa de quadros
         <select id="fps">
           <option value="30">30 FPS</option>
-          <option value="60" selected>60 FPS</option>
+          <option value="60" selected>60 FPS (Padrão)</option>
+          <option value="120">120 FPS (Ultra Gamer)</option>
+          <option value="144">144 FPS (Competitivo)</option>
+          <option value="240">240 FPS (Extremo)</option>
         </select>
       </label>
       <label>Resolução
@@ -228,31 +232,37 @@ function getPresetParameters(
   preset: QualityPreset | undefined,
   baseMaxKbps: number,
   baseFps: number,
+  customFps?: number,
 ): { kbps: number; fps: number; scaleDown: number } {
+  let targetFps = baseFps;
+  if (typeof customFps === "number" && customFps > 0) {
+    targetFps = Math.min(customFps, baseFps);
+  }
+
   switch (preset) {
     case "720p":
       return {
         kbps: Math.min(baseMaxKbps, 2500),
-        fps: Math.min(baseFps, 60),
+        fps: Math.min(targetFps, 60),
         scaleDown: 1.5,
       };
     case "480p":
       return {
         kbps: Math.min(baseMaxKbps, 1200),
-        fps: Math.min(baseFps, 30),
+        fps: Math.min(targetFps, 30),
         scaleDown: 2.25,
       };
     case "360p":
       return {
         kbps: Math.min(baseMaxKbps, 600),
-        fps: Math.min(baseFps, 30),
+        fps: Math.min(targetFps, 30),
         scaleDown: 3,
       };
     case "source":
     default:
       return {
         kbps: baseMaxKbps,
-        fps: baseFps,
+        fps: targetFps,
         scaleDown: 1,
       };
   }
@@ -310,6 +320,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   let activeBitrateKbps = Number(brSelect.value);
   const viewers = new Map<string, ViewerEntry>();
   const requestedPresets = new Map<string, QualityPreset>();
+  const requestedFps = new Map<string, number>();
   const pendingViewers = new Map<string, PendingViewerEntry>();
   const approvedClients = new Set<string>();
   const blockedIds = new Set<string>();
@@ -556,6 +567,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     if (expectedConn && entry.conn !== expectedConn) return;
     viewers.delete(id);
     requestedPresets.delete(id);
+    requestedFps.delete(id);
     entry.cleanup();
     if (!silent) broadcastCount();
   };
@@ -610,6 +622,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     approvedClients.clear();
     blockedIds.clear();
     requestedPresets.clear();
+    requestedFps.clear();
     failedPasswordAttempts.clear();
     countEl.textContent = "0 espectadores";
     updateCapacityUi();
@@ -649,6 +662,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         entry.qualityPreset,
         entry.adapter.maxKbps,
         opts.fps,
+        entry.customFps,
       );
       applyCodecPreferences(entry.pc, codecOrder);
       void capVideoSender(entry.pc, kbps, fps, opts.hint, scaleDown);
@@ -861,6 +875,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
               requestedPresets.get(conn.peer),
               adapter.maxKbps,
               opts.fps,
+              requestedFps.get(conn.peer),
             );
             applyCodecPreferences(pc, codecOrder);
             void capVideoSender(pc, kbps, fps, opts.hint, scaleDown);
@@ -990,12 +1005,13 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           lastStats: null,
           diagnosticBuffer,
           qualityPreset: requestedPresets.get(conn.peer) ?? "source",
+          customFps: requestedFps.get(conn.peer),
           cleanup,
         };
         viewers.set(conn.peer, entry);
         applyViewerQuality(entry);
         send(conn, { t: "approved" });
-        send(conn, { t: "welcome" });
+        send(conn, { t: "welcome", maxFps: opts.fps });
         broadcastCount();
       };
 
@@ -1009,6 +1025,17 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           const entry = viewers.get(conn.peer);
           if (entry) {
             entry.qualityPreset = msg.preset;
+            applyViewerQuality(entry);
+          }
+          return;
+        }
+
+        if (msg.t === "fps-cap") {
+          const clamped = Math.min(Math.max(5, msg.fps), opts.fps);
+          requestedFps.set(conn.peer, clamped);
+          const entry = viewers.get(conn.peer);
+          if (entry) {
+            entry.customFps = clamped;
             applyViewerQuality(entry);
           }
           return;
@@ -1163,6 +1190,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
             entry.qualityPreset,
             entry.adapter.maxKbps,
             opts.fps,
+            entry.customFps,
           );
           void capVideoSender(entry.pc, kbps, fps, opts.hint, scaleDown);
         }
@@ -1243,6 +1271,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         peerId: id,
         clientId: entry.clientId,
         qualityPreset: entry.qualityPreset ?? "source",
+        customFps: entry.customFps,
         currentBitrateCapKbps: entry.adapter.maxKbps,
         isReduced: entry.adapter.isReduced,
         reductionReason: entry.adapter.reductionReason,
