@@ -40,7 +40,7 @@ test.describe("Trava de Criação de Sala - Máquina Autorizada", () => {
     await expect(noticeDlg).toContainText("Chave incorreta");
 
     // Chave correta -> desbloqueia e abre Criar Sala
-    await passInput.fill("ping-master-2026");
+    await passInput.fill("0604");
     await noticeDlg.getByRole("button", { name: "Desbloquear máquina" }).click();
 
     await expect(noticeDlg).toHaveCount(0);
@@ -48,5 +48,15 @@ test.describe("Trava de Criação de Sala - Máquina Autorizada", () => {
 
     const isAuthed = await page.evaluate(() => localStorage.getItem("ping:creator_authorized"));
     expect(isAuthed).toBe("true");
+  });
+
+  test("desbloqueio direto via parâmetro ?admin=0604 na URL", async ({ page }) => {
+    await page.goto("/?admin=0604");
+    const isAuthed = await page.evaluate(() => localStorage.getItem("ping:creator_authorized"));
+    expect(isAuthed).toBe("true");
+    expect(page.url()).not.toContain("admin=");
+
+    await page.locator("#sidebar-create").click();
+    await expect(page.getByRole("dialog", { name: "Criar Sala" })).toBeVisible();
   });
 });

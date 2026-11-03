@@ -344,3 +344,17 @@ Para oferecer paridade completa com a experiência de transmissão de tela do Di
   - Refinamento do comportamento de flexbox em telas móveis estreitas ($\le 560\text{px}$), aplicando `max-width: 140px; flex-shrink: 1;` aos seletores `#quality-preset` e `#fps-selector`, prevenindo estouro horizontal do player ou quebra inesperada de botões críticos (som, tela cheia, teatro e popout).
 - **Conformidade Contínua de Acessibilidade e Segurança**:
   - 100% de conformidade mantida com CSP rigorosa (`style-src 'self'`), zero anúncios nas áreas de transmissão (host e viewer), zero CLS em elementos de tela, 66 testes de contraste WCAG AA aprovados e 52 testes automatizados E2E executados com sucesso absoluto.
+
+
+---
+
+## 21. Configuração da Chave do Anfitrião (0604)
+
+- **Chave do Anfitrião / Desenvolvedor Atualizada (`0604`)**:
+  - `DEFAULT_CREATOR_KEY` em `src/app/auth-gate.ts` configurada oficialmente como `"0604"`.
+  - Desbloqueio imediato aceitando a chave `"0604"` através de:
+    1. Parâmetro de URL direta: `/?admin=0604`, `/?key=0604` ou `/?creator_key=0604` (com limpeza automática do parâmetro na barra de endereços).
+    2. Modal de fase fechada de testes digitando `0604` no campo *"Chave de acesso"*.
+    3. Senha de salas de demonstração privadas aceitando também `"0604"` além de `"demo"`.
+  - Compatibilidade com testes legados preservada, permitindo ambas as chaves sem regressão.
+  - Novos testes automatizados adicionados em `e2e/auth-gate.spec.ts` validando o desbloqueio por URL e por modal com a chave `0604`.

@@ -89,7 +89,7 @@ export class MockRoomService implements RoomService {
     if (st.lockedUntil > now) {
       return { ok: false, attemptsLeft: 0, lockedMs: st.lockedUntil - now };
     }
-    if (password === "demo" || password === "ping2026" || password === "teste2026") {
+    if (password === "demo" || password === "ping2026" || password === "teste2026" || password === "0604") {
       this.attempts.delete(roomId);
       return { ok: true, attemptsLeft: MAX_PASSWORD_ATTEMPTS };
     }
