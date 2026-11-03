@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ping Benchmark - 1080p60 Motion & Detail</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: #0b0d12;
+        color: #e8ecf5;
+        font-family: system-ui, -apple-system, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        overflow: hidden;
+      }
+      canvas {
+        width: 100vw;
+        max-width: 1920px;
+        aspect-ratio: 16 / 9;
+        display: block;
+        background: #000;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1920" height="1080"></canvas>
+    <script>
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      let frame = 0;
+      let lastTime = performance.now();
+      let fps = 60;
+      let fpsSamples = [];
+
+      function draw() {
+        const now = performance.now();
+        const delta = now - lastTime;
+        lastTime = now;
+        if (delta > 0) {
+          fpsSamples.push(1000 / delta);
+          if (fpsSamples.length > 30) fpsSamples.shift();
+          fps = Math.round(fpsSamples.reduce((a, b) => a + b, 0) / fpsSamples.length);
+        }
+
+        frame++;
+
+        // Fundo com gradiente sutil
+        const bgGrad = ctx.createLinearGradient(0, 0, 1920, 1080);
+        bgGrad.addColorStop(0, "#080a0f");
+        bgGrad.addColorStop(1, "#121724");
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, 1920, 1080);
+
+        // Grade de referência de nitidez
+        ctx.strokeStyle = "#1b2336";
+        ctx.lineWidth = 1;
+        for (let x = 0; x < 1920; x += 80) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 1080);
+          ctx.stroke();
+        }
+        for (let y = 0; y < 1080; y += 60) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(1920, y);
+          ctx.stroke();
+        }
+
+        // Elementos em movimento contínuo (avalia fluidez a 60 FPS)
+        const t = now * 0.001;
+
+        // Barra rotatória central
+        ctx.save();
+        ctx.translate(960, 540);
+        ctx.rotate(t * 1.5);
+        const rotGrad = ctx.createLinearGradient(-350, 0, 350, 0);
+        rotGrad.addColorStop(0, "#5b8cff");
+        rotGrad.addColorStop(0.5, "#7a5bff");
+        rotGrad.addColorStop(1, "#3ddc97");
+        ctx.fillStyle = rotGrad;
+        ctx.fillRect(-350, -8, 700, 16);
+        ctx.restore();
+
+        // Esferas orbitais com rastros
+        for (let i = 0; i < 4; i++) {
+          const angle = t * (1.2 + i * 0.4) + (i * Math.PI) / 2;
+          const radius = 220 + i * 70;
+          const x = 960 + Math.cos(angle) * radius;
+          const y = 540 + Math.sin(angle) * radius;
+          ctx.beginPath();
+          ctx.arc(x, y, 22 - i * 3, 0, Math.PI * 2);
+          ctx.fillStyle = ["#5b8cff", "#7a5bff", "#ffcf6b", "#3ddc97"][i];
+          ctx.fill();
+        }
+
+        // Barra oscilante horizontal de teste de sincronia/tearing
+        const sweepX = (Math.sin(t * 3) * 0.5 + 0.5) * 1880 + 20;
+        ctx.fillStyle = "#ff5b6b";
+        ctx.fillRect(sweepX - 4, 180, 8, 720);
+
+        // Painel de informações e texto de alta nitidez
+        ctx.fillStyle = "rgba(19, 23, 34, 0.88)";
+        ctx.strokeStyle = "#262d3f";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(80, 80, 520, 360, 16);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#e8ecf5";
+        ctx.font = "bold 28px monospace";
+        ctx.fillText("PING WEBRTC BENCHMARK", 110, 130);
+
+        ctx.font = "20px monospace";
+        ctx.fillStyle = "#3ddc97";
+        ctx.fillText(`FPS Gerador: ${fps} (meta: 60 FPS)`, 110, 175);
+
+        ctx.fillStyle = "#9da7bd";
+        ctx.fillText(`Quadro: #${frame}`, 110, 215);
+        ctx.fillText(`Tempo: ${(now / 1000).toFixed(2)} s`, 110, 255);
+        ctx.fillText(`Resolução: 1920 × 1080 px`, 110, 295);
+
+        // Amostras de texto fino para teste de legibilidade / QP
+        ctx.fillStyle = "#e8ecf5";
+        ctx.font = "14px monospace";
+        ctx.fillText("Legibilidade 14px: The quick brown fox jumps over the lazy dog.", 110, 350);
+        ctx.font = "11px monospace";
+        ctx.fillStyle = "#9da7bd";
+        ctx.fillText("Legibilidade 11px: 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz", 110, 385);
+        ctx.font = "9px monospace";
+        ctx.fillStyle = "#6d7890";
+        ctx.fillText("Legibilidade 9px: WebRTC getStats outbound-rtp qualityLimitationReason availableOutgoingBitrate", 110, 415);
+
+        // Painel inferior direito: relógio de alta precisão
+        ctx.fillStyle = "rgba(19, 23, 34, 0.88)";
+        ctx.beginPath();
+        ctx.roundRect(1320, 820, 520, 180, 16);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#e8ecf5";
+        ctx.font = "bold 24px monospace";
+        ctx.fillText("LATÊNCIA VISUAL / TIMESTAMP", 1350, 865);
+        ctx.font = "bold 36px monospace";
+        ctx.fillStyle = "#ffcf6b";
+        const date = new Date();
+        const timeStr = date.toTimeString().split(" ")[0] + "." + String(date.getMilliseconds()).padStart(3, "0");
+        ctx.fillText(timeStr, 1350, 920);
+
+        ctx.font = "14px monospace";
+        ctx.fillStyle = "#9da7bd";
+        ctx.fillText(`Epoch ms: ${Math.round(now)}`, 1350, 960);
+
+        requestAnimationFrame(draw);
+      }
+
+      requestAnimationFrame(draw);
+    </script>
+  </body>
+</html>

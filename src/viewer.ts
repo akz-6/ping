@@ -11,8 +11,13 @@ import {
   type DeniedReason,
   type ToHost,
 } from "./protocol";
-import { StatsSampler, type ConnectionQuality } from "./stats";
-import { $, shortId } from "./ui";
+import {
+  CircularBuffer,
+  StatsSampler,
+  type ConnectionQuality,
+  type ViewerDiagnosticSample,
+} from "./stats";
+import { $, copyText, shortId } from "./ui";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BACKOFF_MS = [1000, 2000, 3000, 5000, 8000];
@@ -63,6 +68,7 @@ const TEMPLATE = `
     <input id="vol" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
     <span id="quality" class="quality" data-level="good" role="status" aria-label="Qualidade da conexão: Boa" title="Qualidade da conexão">Boa</span>
     <span id="stats" class="stats" aria-live="off"></span>
+    <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico da conexão em JSON">Diagnóstico</button>
     <button id="fs" type="button" title="Alternar tela cheia (F)">Tela cheia</button>
   </div>
 </main>
@@ -83,8 +89,10 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const vol = $<HTMLInputElement>(root, "#vol");
   const qualityEl = $<HTMLElement>(root, "#quality");
   const statsEl = $<HTMLElement>(root, "#stats");
+  const copyDiagBtn = $<HTMLButtonElement>(root, "#copy-diag");
   const fsBtn = $<HTMLButtonElement>(root, "#fs");
   const container = $<HTMLElement>(root, ".viewer");
+  const diagnosticBuffer = new CircularBuffer<ViewerDiagnosticSample>(300);
 
   video.muted = true;
   video.defaultMuted = true;
@@ -508,6 +516,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
             if (peer !== p || finished) return;
             const s = await sampler.sample();
             if (!s) return;
+            diagnosticBuffer.push(s.diagnostic);
             const ping = s.rttMs === null ? "" : ` · ${Math.round(s.rttMs)} ms`;
             statsEl.textContent = `${s.width}×${s.height} · ${s.fps} fps · ${(s.kbps / 1000).toFixed(1)} Mbps${ping}`;
             const qLabel = formatQualityLabel(s.quality);
@@ -693,6 +702,26 @@ export function mountViewer(root: HTMLElement, room: string): void {
     }
     syncSoundUi();
     showBarTemporarily();
+  });
+
+  copyDiagBtn.addEventListener("click", async () => {
+    const diagData = {
+      role: "viewer",
+      timestamp: new Date().toISOString(),
+      roomId: room,
+      clientId,
+      samplesCount: diagnosticBuffer.length,
+      samples: diagnosticBuffer.getAll(),
+    };
+    (window as any).__pingLastDiag = diagData;
+    const ok = await copyText(JSON.stringify(diagData, null, 2));
+    if (ok) {
+      const prev = copyDiagBtn.textContent;
+      copyDiagBtn.textContent = "Copiado!";
+      window.setTimeout(() => {
+        copyDiagBtn.textContent = prev;
+      }, 2000);
+    }
   });
 
   fsBtn.addEventListener("click", () => {

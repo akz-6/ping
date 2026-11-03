@@ -15,9 +15,36 @@ export function toast(message: string, kind: "info" | "error" = "info"): void {
 }
 
 export async function copyText(text: string): Promise<boolean> {
+  if (
+    navigator.clipboard &&
+    typeof navigator.clipboard.writeText === "function" &&
+    document.hasFocus()
+  ) {
+    try {
+      const ok = await Promise.race([
+        navigator.clipboard.writeText(text).then(() => true),
+        new Promise<boolean>((_, reject) =>
+          window.setTimeout(() => reject(new Error("timeout")), 800),
+        ),
+      ]);
+      return ok;
+    } catch {
+      // Fallback para textarea caso permissão ou foco falhe
+    }
+  }
+
   try {
-    await navigator.clipboard.writeText(text);
-    return true;
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "-9999px";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
   } catch {
     return false;
   }

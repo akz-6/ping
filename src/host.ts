@@ -8,6 +8,7 @@ import {
   CODEC_PRESETS,
   preferVideoCodecsInSdp,
   setContentHint,
+  type BitrateAdapterMode,
   type CaptureOptions,
   type CodecPreset,
   type ContentHint,
@@ -19,7 +20,9 @@ import {
   type ToViewer,
 } from "./protocol";
 import {
+  CircularBuffer,
   SenderStatsSampler,
+  type HostDiagnosticSample,
   type QualityLimitationReason,
   type SenderStatsSample,
 } from "./stats";
@@ -39,6 +42,7 @@ interface ViewerEntry {
   sampler: SenderStatsSampler | null;
   adapter: BitrateAdapter;
   lastStats: SenderStatsSample | null;
+  diagnosticBuffer: CircularBuffer<HostDiagnosticSample>;
   cleanup: () => void;
 }
 
@@ -75,7 +79,7 @@ function formatLimitation(reason: QualityLimitationReason | undefined): string {
     case "bandwidth":
       return "Banda";
     case "cpu":
-      return "CPU";
+      return "CPU (alta)";
     case "other":
       return "Outro";
     case "none":
@@ -135,6 +139,12 @@ const TEMPLATE = `
             <option value="vp8">VP8 → H.264 → VP9 → AV1 (compatibilidade)</option>
           </select>
         </label>
+        <label>Controle de bitrate
+          <select id="bitrate-mode">
+            <option value="fixed" selected>Fixo (mantém teto configurado - recomendado)</option>
+            <option value="adaptive">Adaptativo (reduz teto apenas sob perda real)</option>
+          </select>
+        </label>
         <label>Meu upload em Mbps
           <input type="number" id="upload-mbps" min="1" max="10000" step="1" value="50" />
         </label>
@@ -187,6 +197,9 @@ const TEMPLATE = `
         </thead>
         <tbody id="stats-body"></tbody>
       </table>
+    </div>
+    <div class="row between live-actions">
+      <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico em JSON">Copiar diagnóstico (JSON)</button>
     </div>
   </section>
 </main>
@@ -418,6 +431,13 @@ export function mountHost(root: HTMLElement): void {
         s?.qualityLimitationReason && s.qualityLimitationReason !== "none"
           ? "limit-active"
           : "";
+      if (s?.qualityLimitationReason === "cpu") {
+        cells[5].title = "CPU sobrecarregada: reduza resolução/FPS ou prefira H.264";
+      } else if (entry.adapter.isReduced && entry.adapter.reductionReason) {
+        cells[5].title = `Teto reduzido: ${entry.adapter.reductionReason}`;
+      } else {
+        cells[5].title = "";
+      }
     }
   };
 
@@ -474,6 +494,7 @@ export function mountHost(root: HTMLElement): void {
 
   const readOptions = (): CaptureOptions & {
     bitrateKbps: number;
+    bitrateMode: BitrateAdapterMode;
     hint: ContentHint;
     codecPreset: CodecPreset;
     maxViewers: number;
@@ -485,11 +506,14 @@ export function mountHost(root: HTMLElement): void {
       Number.isInteger(rawMax) && rawMax >= 1 && rawMax <= 50
         ? rawMax
         : DEFAULT_MAX_VIEWERS;
+    const bitrateModeSelect = root.querySelector<HTMLSelectElement>("#bitrate-mode");
+    const bitrateMode = (bitrateModeSelect?.value ?? "fixed") as BitrateAdapterMode;
     return {
       fps: Number($<HTMLSelectElement>(root, "#fps").value),
       height: Number($<HTMLSelectElement>(root, "#res").value),
       audio: $<HTMLInputElement>(root, "#audio").checked,
       bitrateKbps: Number(brSelect.value),
+      bitrateMode,
       hint: $<HTMLSelectElement>(root, "#hint").value as ContentHint,
       codecPreset: $<HTMLSelectElement>(root, "#codec").value as CodecPreset,
       maxViewers,
@@ -605,8 +629,14 @@ export function mountHost(root: HTMLElement): void {
             const sample = await entry.sampler.sample();
             if (!sample) return;
             entry.lastStats = sample;
+            entry.diagnosticBuffer.push(sample.diagnostic);
             const { changed, maxKbps } = entry.adapter.update(
-              sample.qualityLimitationReason,
+              {
+                qualityLimitationReason: sample.qualityLimitationReason,
+                availableOutgoingBitrateKbps: sample.availableOutgoingBitrateKbps,
+                rttMs: sample.rttMs,
+                packetLossRatio: sample.packetLossRatio,
+              },
               1000,
             );
             if (changed) {
@@ -720,7 +750,9 @@ export function mountHost(root: HTMLElement): void {
           return;
         }
 
-        const adapter = new BitrateAdapter(opts.bitrateKbps);
+        const adapter = new BitrateAdapter(opts.bitrateKbps, {
+          mode: opts.bitrateMode,
+        });
         const pc = call.peerConnection as RTCPeerConnection | undefined;
         if (pc) {
           applyCodecPreferences(pc, codecOrder);
@@ -771,6 +803,7 @@ export function mountHost(root: HTMLElement): void {
           const state = pc.iceConnectionState;
           if (state === "connected" || state === "completed") {
             clearIceTimer();
+            adapter.reset();
             apply();
           } else if (state === "disconnected" || state === "failed") {
             void restartMediaIce();
@@ -796,6 +829,7 @@ export function mountHost(root: HTMLElement): void {
         const onConnStateChange = (): void => {
           if (!pc) return;
           if (pc.connectionState === "connected") {
+            adapter.reset();
             apply();
           } else if (pc.connectionState === "closed") {
             dropViewer(conn.peer, conn);
@@ -833,14 +867,25 @@ export function mountHost(root: HTMLElement): void {
           }
         };
 
+        const diagnosticBuffer = new CircularBuffer<HostDiagnosticSample>(300);
         viewers.set(conn.peer, {
           conn,
           call,
           pc,
           clientId,
-          sampler: pc ? new SenderStatsSampler(pc) : null,
+          sampler: pc
+            ? new SenderStatsSampler(
+                pc,
+                () =>
+                  call.peerConnection
+                    ?.getSenders()
+                    ?.find((s) => s.track?.kind === "video"),
+                () => currentVideoTrack,
+              )
+            : null,
           adapter,
           lastStats: null,
+          diagnosticBuffer,
           cleanup,
         });
         send(conn, { t: "approved" });
@@ -971,6 +1016,53 @@ export function mountHost(root: HTMLElement): void {
     const ok = await copyText(linkInput.value);
     toast(ok ? "Link copiado. Cole no Discord." : "Não consegui copiar. Selecione e copie manualmente.");
     if (!ok) linkInput.select();
+  });
+
+  const copyDiagBtn = $<HTMLButtonElement>(root, "#copy-diag");
+  copyDiagBtn.addEventListener("click", async () => {
+    const opts = readOptions();
+    const track = currentVideoTrack;
+    const diagData = {
+      role: "host",
+      timestamp: new Date().toISOString(),
+      roomId: peer?.id ?? "",
+      settings: {
+        bitrateMode: opts.bitrateMode,
+        configuredBitrateKbps: activeBitrateKbps,
+        fps: opts.fps,
+        resolutionHeight: opts.height,
+        codecPreset: opts.codecPreset,
+        contentHint: opts.hint,
+        uploadLimitMbps: getUploadLimitMbps(),
+      },
+      trackSettings: track
+        ? {
+            width: track.getSettings().width,
+            height: track.getSettings().height,
+            frameRate: track.getSettings().frameRate
+              ? Math.round(track.getSettings().frameRate!)
+              : undefined,
+          }
+        : null,
+      viewersCount: viewers.size,
+      viewers: [...viewers.entries()].map(([id, entry]) => ({
+        peerId: id,
+        clientId: entry.clientId,
+        currentBitrateCapKbps: entry.adapter.maxKbps,
+        isReduced: entry.adapter.isReduced,
+        reductionReason: entry.adapter.reductionReason,
+        samplesCount: entry.diagnosticBuffer.length,
+        samples: entry.diagnosticBuffer.getAll(),
+      })),
+    };
+    (window as any).__pingLastDiag = diagData;
+    const ok = await copyText(JSON.stringify(diagData, null, 2));
+    toast(
+      ok
+        ? "Diagnóstico copiado para a área de transferência (JSON)."
+        : "Erro ao copiar diagnóstico.",
+      ok ? "info" : "error",
+    );
   });
 
   window.addEventListener("beforeunload", stop);

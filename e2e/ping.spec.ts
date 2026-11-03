@@ -122,38 +122,16 @@ test("fluxo ponta a ponta: host inicia, reinicia sem recarregar e transmite para
     /^(Nenhuma|Banda|CPU|Outro)$/,
   );
 
-  // Simula limitação de banda (qualityLimitationReason = "bandwidth") por > 5 s para validar redução automática do teto de bitrate
-  await hostPage.evaluate(() => {
-    const origGetStats = RTCPeerConnection.prototype.getStats;
-    (window as any).__origGetStats = origGetStats;
-    RTCPeerConnection.prototype.getStats = async function () {
-      const report = await origGetStats.call(this);
-      const patched = new Map<string, any>();
-      report.forEach((v: any, k: string) => {
-        if (v.type === "outbound-rtp" && v.kind === "video") {
-          patched.set(k, { ...v, qualityLimitationReason: "bandwidth" });
-        } else {
-          patched.set(k, v);
-        }
-      });
-      return patched as unknown as RTCStatsReport;
-    };
-  });
+  // Q1: Valida que no modo padrão Fixo, o teto permanece íntegro e não sofre redução indevida
+  await expect(hostPage.locator("#stats-body tr td").nth(2)).not.toContainText("teto");
 
-  await expect(hostPage.locator("#stats-body tr td").nth(5)).toHaveText(
-    "Banda",
-    { timeout: 10_000 },
-  );
-  await expect(hostPage.locator("#stats-body tr td").nth(2)).toContainText(
-    "teto 5.8",
-    { timeout: 10_000 },
-  );
+  // Q1: Valida botões de exportação de diagnóstico (JSON) no host e no viewer
+  await hostPage.locator("#copy-diag").click();
+  await expect(hostPage.locator("#toasts")).toContainText("Diagnóstico");
 
-  // Restaura getStats original
-  await hostPage.evaluate(() => {
-    if ((window as any).__origGetStats) {
-      RTCPeerConnection.prototype.getStats = (window as any).__origGetStats;
-    }
+  await viewerPage.locator("#copy-diag").click();
+  await expect(viewerPage.locator("#copy-diag")).toHaveText("Copiado!", {
+    timeout: 5000,
   });
 
   // 4. Derruba a rede do viewer por 5 s e restaura: deve reconectar sem recarregar a página

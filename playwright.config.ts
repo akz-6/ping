@@ -8,6 +8,7 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:5173",
     headless: true,
+    permissions: ["clipboard-read", "clipboard-write"],
     launchOptions: {
       args: [
         "--use-fake-ui-for-media-stream",

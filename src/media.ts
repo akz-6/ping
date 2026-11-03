@@ -207,18 +207,47 @@ export async function capVideoSender(
   }
 }
 
+export type BitrateAdapterMode = "fixed" | "adaptive";
+
+export interface BitrateAdapterOptions {
+  mode?: BitrateAdapterMode;
+  floorKbps?: number;
+}
+
+export interface NetworkMetrics {
+  qualityLimitationReason?: QualityLimitationReason;
+  availableOutgoingBitrateKbps?: number | null;
+  rttMs?: number | null;
+  packetLossRatio?: number | null;
+}
+
 /**
- * Controlador adaptativo de bitrate por espectador:
- * - Se `qualityLimitationReason` for `bandwidth` por mais de 5 s, reduz `maxBitrate` em passos.
- * - Quando estabilizar em `none`, sobe de volta com cautela até o bitrate base configurado.
+ * Controlador de bitrate por espectador.
+ *
+ * Modo padrão: "fixed" (o teto configurado pelo host nunca é reduzido automaticamente).
+ * Modo opcional: "adaptive" (reduz o teto somente sob evidência real e sustentada de rede ruim,
+ * e NUNCA por causa isolada de qualityLimitationReason).
  */
 export class BitrateAdapter {
   private currentKbps: number;
-  private bandwidthLimitedMs = 0;
-  private stableMs = 0;
+  private readonly floorKbps: number;
+  private mode: BitrateAdapterMode;
+  private badNetworkMs = 0;
+  private goodNetworkMs = 0;
+  private timeSinceLastStepMs = 0;
+  private baselineRttMs: number | null = null;
+  private lastReductionReason = "";
 
-  constructor(private readonly baseKbps: number) {
+  constructor(
+    private readonly baseKbps: number,
+    options: BitrateAdapterOptions = {},
+  ) {
     this.currentKbps = baseKbps;
+    this.mode = options.mode ?? "fixed";
+    // Piso de segurança: 40% do teto configurado e pelo menos 1.5 Mbps (sem ultrapassar o teto base)
+    this.floorKbps =
+      options.floorKbps ??
+      Math.min(baseKbps, Math.max(1500, Math.round(baseKbps * 0.40)));
   }
 
   get maxKbps(): number {
@@ -229,49 +258,144 @@ export class BitrateAdapter {
     return this.currentKbps < this.baseKbps;
   }
 
+  get currentMode(): BitrateAdapterMode {
+    return this.mode;
+  }
+
+  get configuredFloorKbps(): number {
+    return this.floorKbps;
+  }
+
+  get reductionReason(): string {
+    return this.lastReductionReason;
+  }
+
+  setMode(mode: BitrateAdapterMode): void {
+    this.mode = mode;
+    if (mode === "fixed") {
+      this.reset();
+    }
+  }
+
+  reset(): void {
+    this.currentKbps = this.baseKbps;
+    this.badNetworkMs = 0;
+    this.goodNetworkMs = 0;
+    this.timeSinceLastStepMs = 0;
+    this.baselineRttMs = null;
+    this.lastReductionReason = "";
+  }
+
   update(
-    reason: QualityLimitationReason,
+    metrics: NetworkMetrics,
     elapsedMs = 1000,
   ): { changed: boolean; maxKbps: number } {
-    if (reason === "bandwidth") {
-      this.bandwidthLimitedMs += elapsedMs;
-      this.stableMs = 0;
-
-      if (this.bandwidthLimitedMs > 5000) {
-        const prev = this.currentKbps;
-        const steppedDown = Math.max(
-          MIN_ADAPTIVE_BITRATE_KBPS,
-          Math.round(this.currentKbps * 0.72),
-        );
-        this.currentKbps = steppedDown;
-        // Mantém 2 s no acumulador para que novos passos ocorram a cada ~3 s se continuar limitado
-        this.bandwidthLimitedMs = 2000;
-        return { changed: this.currentKbps !== prev, maxKbps: this.currentKbps };
+    if (this.mode === "fixed") {
+      if (this.currentKbps !== this.baseKbps) {
+        this.currentKbps = this.baseKbps;
+        return { changed: true, maxKbps: this.currentKbps };
       }
-      return { changed: false, maxKbps: this.currentKbps };
+      return { changed: false, maxKbps: this.baseKbps };
     }
 
-    if (reason === "none") {
-      this.bandwidthLimitedMs = 0;
-      if (this.currentKbps < this.baseKbps) {
-        this.stableMs += elapsedMs;
-        if (this.stableMs >= 8000) {
-          const prev = this.currentKbps;
-          const stepUp = Math.max(250, Math.round(this.currentKbps * 0.15));
-          this.currentKbps = Math.min(this.baseKbps, this.currentKbps + stepUp);
-          this.stableMs = 0;
-          return {
-            changed: this.currentKbps !== prev,
-            maxKbps: this.currentKbps,
-          };
+    this.timeSinceLastStepMs += elapsedMs;
+
+    // Linha de base de RTT (menor valor observado em condições saudáveis)
+    const rtt = metrics.rttMs;
+    if (typeof rtt === "number" && rtt > 0) {
+      if (this.baselineRttMs === null) {
+        this.baselineRttMs = rtt;
+      } else if (rtt < this.baselineRttMs) {
+        this.baselineRttMs = rtt;
+      }
+    }
+
+    // 1. availableOutgoingBitrate < 90% do teto atual
+    const avail = metrics.availableOutgoingBitrateKbps;
+    const isAvailBelowThreshold =
+      typeof avail === "number" &&
+      avail > 0 &&
+      avail < this.currentKbps * 0.90;
+
+    // 2. perda de pacotes sustentada acima de 5%
+    const loss = metrics.packetLossRatio;
+    const isLossHigh = typeof loss === "number" && loss > 0.05;
+
+    // 3. RTT > 3x a linha de base (com piso de 60 ms para evitar ruído local como 2 ms -> 7 ms)
+    const isRttHigh =
+      typeof rtt === "number" &&
+      this.baselineRttMs !== null &&
+      this.baselineRttMs > 0 &&
+      rtt > this.baselineRttMs * 3 &&
+      rtt > 60;
+
+    // Limitação por CPU nunca reduz bitrate: apenas orienta o usuário
+    const isNetworkBad = isAvailBelowThreshold || isLossHigh || isRttHigh;
+
+    if (isNetworkBad) {
+      this.badNetworkMs += elapsedMs;
+      this.goodNetworkMs = 0;
+
+      // Reduzir somente se sustentado por >= 8 s e com intervalo mínimo de 5 s entre passos
+      if (this.badNetworkMs >= 8000 && this.timeSinceLastStepMs >= 5000) {
+        const prev = this.currentKbps;
+        // Passo de no máximo 15%
+        let nextKbps = Math.round(this.currentKbps * 0.85);
+
+        // Nunca reduzir abaixo da estimativa de banda nem abaixo do piso
+        nextKbps = Math.max(this.floorKbps, nextKbps);
+        if (typeof avail === "number" && avail > 0 && avail < this.currentKbps) {
+          nextKbps = Math.max(nextKbps, Math.round(avail));
+        }
+        nextKbps = Math.min(this.currentKbps, nextKbps);
+
+        if (nextKbps < prev) {
+          this.currentKbps = nextKbps;
+          this.timeSinceLastStepMs = 0;
+          this.badNetworkMs = 3000; // mantém 3 s no acumulador para que novos passos ocorram a cada 5 s se a condição persistir
+          this.lastReductionReason = isAvailBelowThreshold
+            ? `Banda disponível (${Math.round(avail!)} kbps < 90% do teto)`
+            : isLossHigh
+              ? `Perda de pacotes (${(loss! * 100).toFixed(1)}% > 5%)`
+              : `RTT elevado (${Math.round(rtt!)} ms > 3x base)`;
+          return { changed: true, maxKbps: this.currentKbps };
         }
       }
       return { changed: false, maxKbps: this.currentKbps };
     }
 
-    // "cpu" ou "other": mantém o bitrate atual sem subir
-    this.bandwidthLimitedMs = 0;
-    this.stableMs = 0;
+    // Rede não está congestionada: zera contador de degradação
+    this.badNetworkMs = 0;
+
+    // Recuperação:
+    // Se estiver reduzido, estimativa de banda > 120% do teto atual e perda < 1%
+    if (this.currentKbps < this.baseKbps) {
+      const isAvailHigh =
+        typeof avail === "number" && avail > this.currentKbps * 1.20;
+      const isLossLow = typeof loss !== "number" || loss < 0.01;
+      const isRttNormal =
+        this.baselineRttMs === null ||
+        typeof rtt !== "number" ||
+        rtt <= this.baselineRttMs * 1.5;
+
+      if (isAvailHigh && isLossLow && isRttNormal) {
+        this.goodNetworkMs += elapsedMs;
+        if (this.goodNetworkMs >= 5000 && this.timeSinceLastStepMs >= 5000) {
+          const prev = this.currentKbps;
+          const stepUp = Math.max(200, Math.round(this.currentKbps * 0.10));
+          this.currentKbps = Math.min(this.baseKbps, this.currentKbps + stepUp);
+          this.goodNetworkMs = 0;
+          this.timeSinceLastStepMs = 0;
+          if (this.currentKbps >= this.baseKbps) {
+            this.lastReductionReason = "";
+          }
+          return { changed: this.currentKbps !== prev, maxKbps: this.currentKbps };
+        }
+      } else {
+        this.goodNetworkMs = 0;
+      }
+    }
+
     return { changed: false, maxKbps: this.currentKbps };
   }
 }
