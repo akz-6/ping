@@ -289,6 +289,35 @@ body {
 .viewer.cursor-hidden { cursor: none; }
 .viewer video { width: 100%; height: 100%; object-fit: contain; background: #000; }
 
+.viewer-osd {
+  position: absolute;
+  top: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(19, 23, 34, 0.9);
+  border: 1px solid var(--line);
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 30;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  animation: osdFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes osdFadeIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.bar button#pip.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
 .status {
   position: absolute;
   inset: 0;

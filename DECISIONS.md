@@ -239,8 +239,13 @@ A política de segurança restritiva definida no `vercel.json` (`script-src 'sel
   - Ao digitar no campo de apelido de exibição, o avatar de 72px e a etiqueta do cabeçalho são atualizados instantaneamente caractere por caractere, proporcionando feedback visual imediato antes de salvar.
 - **Títulos Dinâmicos de Página**:
   - `document.title` sincronizado dinamicamente de acordo com o contexto do usuário: *"Ping — Salas ao Vivo"* (Lobby), *"Ping — Transmissão ({sala})"* (Viewer) e *"Ping — Compartilhar Tela"* (Host).
+- **Janela Flutuante / Popout (Picture-in-Picture estilo Discord)**:
+  - Implementado o botão dedicado `Popout` (`#pip`) na barra de controles do player e atalho de teclado `P` para desacoplar a transmissão em uma janela flutuante suspensa nativa do sistema operacional (`requestPictureInPicture()`), permitindo assistir enquanto o usuário joga, navega em outros sites ou utiliza qualquer outro programa.
+  - Sincronização de ciclo de vida com `enterpictureinpicture` e `leavepictureinpicture`, fechamento gracioso caso a transmissão seja encerrada e feedback imediato através do OSD.
+- **HUD / OSD (On-Screen Display)**:
+  - Notificações de tela centralizadas inspiradas no ArtPlayer exibindo badges dinâmicos (`🖼️ Janela flutuante ativada (Popout)`, `🔊 Volume: X%`, `🔇 Silenciado`, `🔲 Tela cheia`) com temporização automática de 1.8s.
 - **Cobertura de Testes Automatizados**:
-  - Total de testes E2E Playwright expandido para **45 testes automatizados** (incluindo testes de estresse com 100 usuários, PWA, LGPD, criptografia PBKDF2 e polimento de UI), todos executando com 100% de sucesso em ~22 segundos.
+  - Total de testes E2E Playwright expandido para **46 testes automatizados** (incluindo testes de estresse com 100 usuários, PWA, LGPD, criptografia PBKDF2, Popout e polimento de UI), todos executando com 100% de sucesso em ~22 segundos.
 
 
 

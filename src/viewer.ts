@@ -54,6 +54,7 @@ function formatDeniedMessage(reason: DeniedReason | undefined): string {
 const TEMPLATE = `
 <main class="viewer" aria-label="Reprodutor da transmissão">
   <video id="v" autoplay playsinline muted></video>
+  <div id="osd" class="viewer-osd" role="status" aria-live="polite" hidden></div>
   <div id="status" class="status" role="status" aria-live="polite">Conectando…</div>
   <div id="auth-wrap" class="status" hidden>
     <form id="auth-form" class="card auth-card">
@@ -70,6 +71,7 @@ const TEMPLATE = `
     <span id="quality" class="quality" data-level="good" role="status" aria-label="Qualidade da conexão: Boa" title="Qualidade da conexão">Boa</span>
     <span id="stats" class="stats" aria-live="off"></span>
     <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico da conexão em JSON">Diagnóstico</button>
+    <button id="pip" type="button" title="Janela flutuante / Popout (P)" aria-label="Assistir em janela flutuante (Popout)">Popout</button>
     <button id="fs" type="button" title="Alternar tela cheia (F)">Tela cheia</button>
   </div>
 </main>
@@ -80,6 +82,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
   root.innerHTML = TEMPLATE;
 
   const video = $<HTMLVideoElement>(root, "#v");
+  const osdEl = $<HTMLElement>(root, "#osd");
   const statusEl = $<HTMLElement>(root, "#status");
   const authWrap = $<HTMLElement>(root, "#auth-wrap");
   const authForm = $<HTMLFormElement>(root, "#auth-form");
@@ -92,6 +95,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const qualityEl = $<HTMLElement>(root, "#quality");
   const statsEl = $<HTMLElement>(root, "#stats");
   const copyDiagBtn = $<HTMLButtonElement>(root, "#copy-diag");
+  const pipBtn = $<HTMLButtonElement>(root, "#pip");
   const fsBtn = $<HTMLButtonElement>(root, "#fs");
   const container = $<HTMLElement>(root, ".viewer");
   const diagnosticBuffer = new CircularBuffer<ViewerDiagnosticSample>(300);
@@ -125,6 +129,20 @@ export function mountViewer(root: HTMLElement, room: string): void {
         container.classList.add("cursor-hidden");
       }
     }, BAR_HIDE_MS);
+  };
+
+  let osdTimer: number | undefined;
+  const showOsd = (text: string): void => {
+    if (!osdEl) return;
+    osdEl.textContent = text;
+    osdEl.hidden = false;
+    if (osdTimer !== undefined) {
+      window.clearTimeout(osdTimer);
+    }
+    osdTimer = window.setTimeout(() => {
+      osdEl.hidden = true;
+      osdTimer = undefined;
+    }, 1800);
   };
 
   const setStatus = (msg: string, isError = false): void => {
@@ -263,6 +281,9 @@ export function mountViewer(root: HTMLElement, room: string): void {
     window.removeEventListener("online", onOnline);
     window.removeEventListener("offline", onOffline);
     window.removeEventListener("keydown", onKeyDown);
+    if (document.pictureInPictureElement === video) {
+      void document.exitPictureInPicture().catch(() => undefined);
+    }
     cleanupCurrentAttempt();
     bar.hidden = true;
     video.srcObject = null;
@@ -274,7 +295,6 @@ export function mountViewer(root: HTMLElement, room: string): void {
     lastFailureReason = reason;
 
     if (backoffTimer !== undefined) return;
-
     cleanupCurrentAttempt();
     gotStream = false;
 
@@ -667,6 +687,59 @@ export function mountViewer(root: HTMLElement, room: string): void {
     webkitVideo.webkitEnterFullscreen?.();
   };
 
+  const isPipSupported = (): boolean => {
+    return Boolean(
+      (document.pictureInPictureEnabled && typeof video.requestPictureInPicture === "function") ||
+        (video as any).webkitSupportsPresentationMode,
+    );
+  };
+
+  const togglePip = async (): Promise<void> => {
+    if (!isPipSupported()) {
+      showOsd("Janela flutuante não suportada");
+      return;
+    }
+    if (video.readyState === 0 && !video.srcObject) {
+      showOsd("Aguardando transmissão para abrir popout…");
+      return;
+    }
+    try {
+      if (document.pictureInPictureElement === video) {
+        await document.exitPictureInPicture();
+        return;
+      }
+      if (document.pictureInPictureEnabled && typeof video.requestPictureInPicture === "function") {
+        await video.requestPictureInPicture();
+        return;
+      }
+      const webkitVideo = video as HTMLVideoElement & {
+        webkitPresentationMode?: string;
+        webkitSetPresentationMode?: (mode: string) => void;
+      };
+      if (typeof webkitVideo.webkitSetPresentationMode === "function") {
+        const isPip = webkitVideo.webkitPresentationMode === "picture-in-picture";
+        webkitVideo.webkitSetPresentationMode(isPip ? "inline" : "picture-in-picture");
+      }
+    } catch (err) {
+      console.warn("Falha ao alternar Picture-in-Picture:", err);
+      showOsd("Janela flutuante indisponível no momento");
+    }
+  };
+
+  video.addEventListener("enterpictureinpicture", () => {
+    pipBtn.textContent = "Voltar";
+    pipBtn.classList.add("active");
+    pipBtn.setAttribute("aria-pressed", "true");
+    showOsd("🖼️ Janela flutuante ativada (Popout)");
+  });
+
+  video.addEventListener("leavepictureinpicture", () => {
+    pipBtn.textContent = "Popout";
+    pipBtn.classList.remove("active");
+    pipBtn.setAttribute("aria-pressed", "false");
+    showOsd("Janela flutuante fechada");
+  });
+
   const onKeyDown = (e: KeyboardEvent): void => {
     if (finished || bar.hidden) return;
     if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -684,10 +757,44 @@ export function mountViewer(root: HTMLElement, room: string): void {
     if (e.key === "m" || e.key === "M") {
       e.preventDefault();
       toggleMute();
+      showOsd(video.muted ? "🔇 Silenciado" : "🔊 Som ativado");
       showBarTemporarily();
     } else if (e.key === "f" || e.key === "F") {
       e.preventDefault();
       toggleFullscreen();
+      showOsd(document.fullscreenElement ? "🔲 Janela normal" : "🔲 Tela cheia");
+      showBarTemporarily();
+    } else if (e.key === "p" || e.key === "P") {
+      e.preventDefault();
+      void togglePip();
+      showBarTemporarily();
+    } else if (e.key === " " || e.key === "k" || e.key === "K") {
+      e.preventDefault();
+      toggleMute();
+      showOsd(video.muted ? "🔇 Silenciado" : "🔊 Som ativado");
+      showBarTemporarily();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const next = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
+      video.volume = next;
+      vol.value = String(next);
+      if (video.muted && next > 0) {
+        video.muted = false;
+        void video.play().catch(() => undefined);
+      }
+      syncSoundUi();
+      showOsd(`🔊 Volume: ${Math.round(next * 100)}%`);
+      showBarTemporarily();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
+      video.volume = next;
+      vol.value = String(next);
+      if (next === 0) {
+        video.muted = true;
+      }
+      syncSoundUi();
+      showOsd(next === 0 ? "🔇 Silenciado" : `🔊 Volume: ${Math.round(next * 100)}%`);
       showBarTemporarily();
     }
   };
@@ -735,6 +842,11 @@ export function mountViewer(root: HTMLElement, room: string): void {
         copyDiagBtn.textContent = prev;
       }, 2000);
     }
+  });
+
+  pipBtn.addEventListener("click", () => {
+    void togglePip();
+    showBarTemporarily();
   });
 
   fsBtn.addEventListener("click", () => {

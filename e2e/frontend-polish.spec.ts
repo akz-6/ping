@@ -74,4 +74,17 @@ test.describe("Polimento Frontend & Pontas Soltas", () => {
     await expect(dlg.locator(".profile-handle")).toHaveText("EstrelaNinja");
     await expect(dlg.locator(".profile-head .avatar")).toHaveText("E");
   });
+
+  test("viewer possui botão de popout (Picture-in-Picture) e elemento OSD", async ({ page }) => {
+    await page.goto("/?room=ping-testpip123");
+    const pipBtn = page.locator("#pip");
+    await expect(pipBtn).toBeAttached();
+    await expect(pipBtn).toHaveText("Popout");
+    await expect(pipBtn).toHaveAttribute("title", /Popout/);
+
+    // Clica no botão de popout (disparando ação)
+    await pipBtn.dispatchEvent("click");
+    const osd = page.locator("#osd");
+    await expect(osd).toBeVisible();
+  });
 });
