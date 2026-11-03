@@ -54,7 +54,30 @@ Abra `http://localhost:5173`, clique em **Iniciar transmissão**, copie o link d
 | `npm run dev` | Inicia o servidor de desenvolvimento Vite em `http://localhost:5173`. |
 | `npm run build` | Executa a checagem estrita de tipos (`tsc --noEmit`) e gera o bundle de produção em `dist/`. |
 | `npm run preview` | Serve o bundle gerado em `dist/` localmente para conferência. |
-| `npm run test:e2e` | *(Opcional)* Executa a suíte E2E no Chromium via Playwright (início/reinício sem reload, vídeo P2P, adaptação de bitrate, reconexão automática, senha, aprovação manual, remoção e CSP). Requer internet por padrão para acessar o PeerJS Cloud, ou `VITE_PEER_HOST` apontando para um PeerServer local. |
+| `node scripts/contrast.mjs` | Valida contrastes WCAG AA (mínimo 4.5:1 para texto e 3:1 para UI) nas 6 combinações de tema/paleta. |
+| `npm run test:e2e` | Executa a suíte de testes ponta a ponta (E2E) via Playwright cobrindo Lobby, modais, responsividade e transmissão P2P. |
+
+---
+
+## Lobby e Sistema de Design (Fase L1–L4)
+
+A interface do Ping foi redesenhada com base nas especificações do Figma (`MNxrW5u2UPqTi8Fvw6dGuG`):
+
+- **Layout em 3 colunas**:
+  - **Sidebar de Navegação (esquerda)**: acesso rápido a Salas, Criar Sala, Perfil de usuário anônimo (`user{8 dígitos}`) e configurações.
+  - **Feed Central**: listagem dinâmica dividida entre **Salas Abertas** (com limite global de até 5 simultâneas) e **Salas Fechadas** (protegidas por senha).
+  - **Coluna de Anúncios (direita)**: slots responsivos (`300×250` e `300×600` no desktop; `320×100` no tablet; cards intercalados no mobile).
+- **Temas e Paletas**:
+  - Alternância instantânea entre **Modo Claro** e **Modo Escuro**.
+  - 3 paletas de marca: **Indigo**, **Teal** e **Terracota**.
+  - Persistência em `localStorage` (`ping:theme` e `ping:palette`) com script de inicialização precoce (`theme-init.js`), prevenindo qualquer flash de conteúdo não estilizado (FOUC).
+- **Acessibilidade WCAG AA**:
+  - Tecla `/` para focar rapidamente na busca de salas; `Esc` para limpar ou fechar modais.
+  - Alternador de visibilidade de senha com anúncio via leitor de tela (`aria-pressed`).
+  - Salas lotadas desabilitadas com preservação de foco e aviso auditivo.
+  - Bloqueio por 30 segundos após 3 tentativas incorretas de senha.
+
+Consulte [`DECISIONS.md`](./DECISIONS.md) para o detalhamento completo dos tokens de design, acessibilidade e arquitetura.
 
 ---
 

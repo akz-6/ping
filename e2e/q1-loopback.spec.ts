@@ -16,7 +16,7 @@ test("Q1: Loopback com conteúdo em movimento - teto permanece íntegro no valor
   const viewerPage = await viewerContext.newPage();
 
   // 1. Host abre e inicia transmissão com 8 Mbps (8000 kbps) no modo padrão Fixo
-  await hostPage.goto("/");
+  await hostPage.goto("/?host=1");
   await hostPage.locator("#start").click();
   await expect(hostPage.locator("#live")).toBeVisible({ timeout: 15_000 });
   const roomLink = await hostPage.locator("#link").inputValue();

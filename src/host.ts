@@ -210,7 +210,7 @@ const TEMPLATE = `
 </main>
 `;
 
-export function mountHost(root: HTMLElement): void {
+export function mountHost(root: HTMLElement, opts: { password?: string } = {}): void {
   root.innerHTML = TEMPLATE;
 
   const setup = $<HTMLElement>(root, "#setup");
@@ -236,6 +236,10 @@ export function mountHost(root: HTMLElement): void {
   const unsupported = $<HTMLElement>(root, "#unsupported");
 
   uploadInput.value = String(readStoredUploadMbps());
+  if (opts.password) {
+    passwordInput.value = opts.password;
+    $<HTMLDetailsElement>(root, "#advanced").open = true;
+  }
 
   if (!navigator.mediaDevices?.getDisplayMedia) {
     unsupported.hidden = false;

@@ -1,4 +1,16 @@
-:root {
+/* Compatibilidade: telas legadas (host e viewer) usam nomes antigos mapeados para os tokens. */
+.legacy {
+  --panel: var(--card);
+  --panel-2: var(--bg);
+  --line: var(--border);
+  --text: var(--text-1);
+  --muted: var(--text-2);
+  --accent: var(--primary);
+  --accent-2: var(--primary-hover);
+  --ok: var(--open-fg);
+}
+/* O viewer é uma superfície de vídeo: mantém aparência escura em qualquer tema. */
+.legacy-dark {
   --bg: #0b0d12;
   --panel: #131722;
   --panel-2: #1a2030;
@@ -19,7 +31,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -27,9 +39,9 @@ html, body { height: 100%; }
 
 body {
   margin: 0;
-  background: radial-gradient(1200px 600px at 50% -10%, #1a2140 0%, var(--bg) 60%);
-  color: var(--text);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  font: var(--fs-body)/1.5 var(--font);
 }
 
 .shell {
@@ -66,8 +78,8 @@ body {
   gap: 16px;
 }
 
-h1 { margin: 0; font-size: 22px; line-height: 1.25; }
-h2 { margin: 0; font-size: 18px; line-height: 1.3; }
+.legacy h1 { margin: 0; font-size: 22px; line-height: 1.25; }
+.legacy h2 { margin: 0; font-size: 18px; line-height: 1.3; }
 .muted { color: var(--muted); margin: 0; }
 .muted.error { color: #ffb3bc; }
 
@@ -81,11 +93,11 @@ h2 { margin: 0; font-size: 18px; line-height: 1.3; }
   .grid { grid-template-columns: 1fr; }
 }
 
-label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
-label.check { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); }
+.legacy label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.legacy label.check { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); }
 .advanced-check { margin-top: 12px; }
 
-select, input[type="text"], input[type="number"], input[type="password"], input:not([type]), input[readonly] {
+.legacy select, .legacy input[type="text"], .legacy input[type="number"], .legacy input[type="password"], .legacy input:not([type]), .legacy input[readonly] {
   width: 100%;
   background: var(--panel-2);
   color: var(--text);
@@ -184,7 +196,7 @@ select, input[type="text"], input[type="number"], input[type="password"], input:
   text-align: left;
 }
 
-button {
+.legacy button {
   font: inherit;
   color: var(--text);
   background: var(--panel-2);
@@ -194,21 +206,21 @@ button {
   cursor: pointer;
   transition: filter 0.15s, transform 0.05s;
 }
-button.sm {
+.legacy button.sm {
   padding: 5px 10px;
   font-size: 12px;
   border-radius: 8px;
 }
-button:hover { filter: brightness(1.15); }
-button:active { transform: translateY(1px); }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.legacy button:hover { filter: brightness(1.15); }
+.legacy button:active { transform: translateY(1px); }
+.legacy button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-button.primary {
+.legacy button.primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border-color: transparent;
   font-weight: 600;
 }
-button.danger { background: #3a1a22; border-color: #5a2630; color: #ffb3bc; }
+.legacy button.danger { background: #3a1a22; border-color: #5a2630; color: #ffb3bc; }
 
 .row { display: flex; gap: 10px; align-items: center; }
 .row.between { justify-content: space-between; }
@@ -351,9 +363,10 @@ button.danger { background: #3a1a22; border-color: #5a2630; color: #ffb3bc; }
   z-index: 50;
 }
 .toast {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
+  background: var(--card);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
   padding: 10px 14px;
   border-radius: 10px;
   max-width: 340px;

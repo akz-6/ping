@@ -31,7 +31,7 @@ test("fluxo ponta a ponta: host inicia, reinicia sem recarregar e transmite para
   });
 
   // 1. Host abre e inicia a primeira transmissão
-  await hostPage.goto("/");
+  await hostPage.goto("/?host=1");
   await hostPage.locator("#start").click();
 
   await expect(hostPage.locator("#live")).toBeVisible({ timeout: 15_000 });
@@ -196,7 +196,7 @@ test("controle de acesso, senha, aprovação manual, mensagens malformadas, remo
   );
 
   // 1. Verifica cabeçalhos de segurança (CSP ativa)
-  const response = await hostPage.goto("/");
+  const response = await hostPage.goto("/?host=1");
   expect(response).not.toBeNull();
   const csp = response!.headers()["content-security-policy"] ?? "";
   expect(csp).toContain("default-src 'self'");
