@@ -14,8 +14,8 @@ export interface StoredRoom {
 }
 
 const BLOB_FILENAME = "rooms-catalog.json";
-const MAX_STALE_MS = 120_000; // 2 minutos sem heartbeat considera inativa
-const MAX_LIFETIME_MS = 14_400_000; // 4 horas máximo de vida
+const MAX_STALE_MS = 15 * 60 * 1000; // 15 minutos sem heartbeat para expiração
+const MAX_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 horas máximo de vida útil da sala
 
 async function getStoredRooms(): Promise<StoredRoom[]> {
   try {
