@@ -32,9 +32,23 @@ export function mountApp(root: HTMLElement): void {
   let view: "lobby" | "host" = "lobby";
 
   const feed = h("div", { class: "feed" });
+  document.title = "Ping — Salas ao Vivo";
   const live = h("p", { class: "sr-only", role: "status", "aria-live": "polite" });
   const lobby = h("section", { class: "lobby" });
   const hostView = h("section", { class: "host-view legacy", hidden: true });
+
+  const resetSearch = (): void => {
+    query = "";
+    const input = search.querySelector<HTMLInputElement>(".search-input");
+    if (input) {
+      input.value = "";
+      const clearBtn = search.querySelector<HTMLButtonElement>(".search-clear");
+      const kbd = search.querySelector<HTMLElement>(".search-kbd");
+      if (clearBtn) clearBtn.hidden = true;
+      if (kbd) kbd.hidden = false;
+    }
+    render();
+  };
 
   const openCount = (): number => rooms.filter((r) => !r.isPrivate).length;
 
@@ -180,7 +194,12 @@ export function mountApp(root: HTMLElement): void {
     }
 
     if (status === "ready" && q && shownOpen.length + shownClosed.length === 0) {
-      feed.append(EmptyState("Nenhuma sala encontrada", "Tente buscar por outro nome."));
+      feed.append(
+        EmptyState("Nenhuma sala encontrada", "Tente buscar por outro nome.", {
+          label: "Limpar busca",
+          onClick: resetSearch,
+        }),
+      );
       return;
     }
 

@@ -35,7 +35,10 @@ export function setLoading(btn: HTMLButtonElement, loading: boolean): void {
 /* ---------- Avatar ---------- */
 export function Avatar(name: string, size: 36 | 40 | 72 = 40): HTMLElement {
   const initial = (name.trim().charAt(0) || "?").toUpperCase();
-  return h("span", { class: `avatar avatar-${size}`, "aria-hidden": "true" }, initial);
+  const clean = name.trim();
+  const hash = clean.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const colorIdx = hash % 6;
+  return h("span", { class: `avatar avatar-${size} avatar-c${colorIdx}`, "aria-hidden": "true" }, initial);
 }
 
 /* ---------- Badge ---------- */

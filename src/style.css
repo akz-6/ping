@@ -60,6 +60,22 @@ body {
   font-size: 20px;
   letter-spacing: 0.3px;
 }
+.host-back-link {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  transition: color 0.15s, border-color 0.15s;
+}
+.host-back-link:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
 
 .dot {
   width: 12px;
@@ -278,6 +294,11 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
   padding: 24px;
   text-align: center;
   background: rgba(11, 13, 18, 0.88);
@@ -285,6 +306,44 @@ body {
   font-size: 17px;
 }
 .status.error { color: #ffb3bc; }
+.status-text {
+  margin: 0;
+  max-width: 480px;
+  line-height: 1.45;
+}
+.btn-back-lobby {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 10px 22px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  transition: filter 0.15s, transform 0.05s;
+}
+.btn-back-lobby:hover { filter: brightness(1.15); }
+.btn-back-lobby:active { transform: translateY(1px); }
+
+.btn-leave-room {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: filter 0.15s, background 0.15s;
+}
+.btn-leave-room:hover { filter: brightness(1.2); background: var(--line); }
 
 .bar {
   position: absolute;
@@ -334,7 +393,7 @@ body {
     gap: 8px;
     padding: 10px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   }
-  .bar button {
+  .bar button, .btn-leave-room {
     padding: 8px 12px;
     font-size: 13px;
     min-height: 40px;

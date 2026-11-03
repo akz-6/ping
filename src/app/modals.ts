@@ -283,6 +283,18 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     ),
   );
 
+  nick.input.addEventListener("input", () => {
+    const val = nick.input.value.trim();
+    const typed = val || profile.handle;
+    handleLabel.textContent = typed;
+    avatarWrap.replaceChildren(Avatar(typed, 72));
+    badgeLabel.textContent = profile.discordLinked
+      ? "Discord"
+      : !val || val === profile.handle
+      ? "Anônimo"
+      : "Personalizado";
+  });
+
   const note = h(
     "p",
     { class: "field-hint" },

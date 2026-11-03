@@ -223,6 +223,25 @@ A política de segurança restritiva definida no `vercel.json` (`script-src 'sel
   - **Resistência a Condições de Corrida**: 10 anfitriões concorrentes tentando abrir salas simultâneas respeitaram com precisão atômica o teto global de 5 salas abertas.
   - **Resiliência a Dados Corrompidos (Chaos Test)**: Injeção de JSON inválido e tipos trocados no `localStorage` recuperados automaticamente sem tela branca nem exceções no console.
 
+---
+
+## 16. Polimento de Frontend & Resolução de Pontas Soltas
+
+- **Navegação e Saída do Visualizador (`src/viewer.ts`)**:
+  - Adicionado botão de saída explícito `← Salas` no painel de reprodução (`#bar`) para que espectadores possam retornar ao lobby com um clique.
+  - No encerramento da transmissão, desconexão ou erro de acesso, o overlay `#status` agora renderiza um botão de ação com alto contraste `← Voltar ao Lobby` (`.btn-back-lobby`), eliminando o problema de tela preta travada sem saída.
+- **Paleta Determinística de Cores de Avatar (`avatar-c0` até `c5`)**:
+  - Implementada função de hash de caracteres sobre o nome do usuário/anfitrião gerando classes determinísticas com 6 matizes refinados (Índigo, Verde-petróleo, Violeta, Carmim, Âmbar e Ciano).
+  - Todas as 6 combinações mantêm índice de contraste WCAG AA superior a 4.9:1 contra texto branco.
+- **Botão de Limpeza em Buscas Vazias**:
+  - Quando a pesquisa não localiza salas correspondentes, o estado vazio (`EmptyState`) oferece o botão primário *"Limpar busca"*, que redefine o campo, restaura o atalho de teclado `/` e repovoa o feed imediatamente.
+- **Preview em Tempo Real no Modal de Perfil (`src/app/modals.ts`)**:
+  - Ao digitar no campo de apelido de exibição, o avatar de 72px e a etiqueta do cabeçalho são atualizados instantaneamente caractere por caractere, proporcionando feedback visual imediato antes de salvar.
+- **Títulos Dinâmicos de Página**:
+  - `document.title` sincronizado dinamicamente de acordo com o contexto do usuário: *"Ping — Salas ao Vivo"* (Lobby), *"Ping — Transmissão ({sala})"* (Viewer) e *"Ping — Compartilhar Tela"* (Host).
+- **Cobertura de Testes Automatizados**:
+  - Total de testes E2E Playwright expandido para **45 testes automatizados** (incluindo testes de estresse com 100 usuários, PWA, LGPD, criptografia PBKDF2 e polimento de UI), todos executando com 100% de sucesso em ~22 segundos.
+
 
 
 

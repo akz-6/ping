@@ -64,6 +64,7 @@ const TEMPLATE = `
     </form>
   </div>
   <div class="bar bar-visible" id="bar" role="region" aria-label="Controles de reprodução" hidden>
+    <a id="leave" href="/" class="btn-leave-room" title="Sair da sala e voltar ao Lobby">← Salas</a>
     <button id="sound" type="button" title="Ativar ou silenciar som (M)">Ativar som</button>
     <input id="vol" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
     <span id="quality" class="quality" data-level="good" role="status" aria-label="Qualidade da conexão: Boa" title="Qualidade da conexão">Boa</span>
@@ -75,6 +76,7 @@ const TEMPLATE = `
 `;
 
 export function mountViewer(root: HTMLElement, room: string): void {
+  document.title = `Ping — Transmissão (${room})`;
   root.innerHTML = TEMPLATE;
 
   const video = $<HTMLVideoElement>(root, "#v");
@@ -128,8 +130,19 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const setStatus = (msg: string, isError = false): void => {
     authWrap.hidden = true;
     statusEl.hidden = false;
-    statusEl.textContent = msg;
     statusEl.classList.toggle("error", isError);
+    statusEl.replaceChildren();
+    const p = document.createElement("p");
+    p.className = "status-text";
+    p.textContent = msg;
+    statusEl.appendChild(p);
+    if (isError || finished || everConnected) {
+      const backLink = document.createElement("a");
+      backLink.href = "/";
+      backLink.className = "btn-back-lobby";
+      backLink.textContent = "← Voltar ao Lobby";
+      statusEl.appendChild(backLink);
+    }
   };
 
   if (!ROOM_PATTERN.test(room)) {

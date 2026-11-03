@@ -92,7 +92,7 @@ function formatLimitation(reason: QualityLimitationReason | undefined): string {
 
 const TEMPLATE = `
 <main class="shell">
-  <header class="brand"><span class="dot"></span> Ping</header>
+  <header class="brand"><span class="dot"></span> Ping <a href="/" class="host-back-link">← Voltar às salas</a></header>
 
   <section class="card" id="setup">
     <h1>Compartilhe sua tela com os amigos</h1>
@@ -212,6 +212,7 @@ const TEMPLATE = `
 `;
 
 export function mountHost(root: HTMLElement, mountOpts: { password?: string; roomId?: string; hostToken?: string } = {}): void {
+  document.title = "Ping — Compartilhar Tela";
   root.innerHTML = TEMPLATE;
 
   const setup = $<HTMLElement>(root, "#setup");
