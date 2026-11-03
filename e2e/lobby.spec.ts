@@ -69,6 +69,18 @@ test.describe("lobby", () => {
     await expect(page.locator("#room-password")).toHaveValue("segredo");
   });
 
+  test("sala criada aparece na lista de salas do lobby ao voltar para salas", async ({ page }) => {
+    await page.locator("#sidebar-create").click();
+    await page.getByLabel("Nome da sala *").fill("Minha Transmissao ao Vivo");
+    await page.getByRole("button", { name: "Criar Sala" }).last().click();
+    await expect(page.locator("#start")).toBeVisible();
+
+    // Clica em 'Salas' na barra lateral para voltar ao lobby
+    await page.locator('.nav-item[data-nav="rooms"]').click();
+    await expect(page.locator(".lobby")).toBeVisible();
+    await expect(page.locator('.room-card:has-text("Minha Transmissao ao Vivo")')).toBeVisible();
+  });
+
   test("olho alterna visibilidade da senha com aria-pressed", async ({ page }) => {
     await page.locator("#sidebar-create").click();
     const pass = page.getByLabel("Senha (opcional)");

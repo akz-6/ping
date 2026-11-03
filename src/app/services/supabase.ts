@@ -1,4 +1,4 @@
-﻿import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   MAX_PASSWORD_ATTEMPTS,
   RoomLimitError,
@@ -285,28 +285,54 @@ export function startHostLifecycle(opts: {
   client?: SupabaseClient;
 }): HostLifecycleHandle {
   const client = opts.client ?? (isSupabaseConfigured() ? createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!) : null);
-  if (!client) {
-    return { stop: () => {}, syncViewers: () => {} };
-  }
 
   let lastSentViewers = 0;
   let viewerThrottleTimer: number | null = null;
 
-  // Heartbeat a cada 20 segundos
+  // Heartbeat a cada 20 segundos para manter a sala ativa
   const heartbeatTimer = window.setInterval(() => {
-    void client.rpc("heartbeat_room", {
-      p_room_id: opts.roomId,
-      p_host_token: opts.hostToken,
-    });
+    if (client) {
+      void client.rpc("heartbeat_room", {
+        p_room_id: opts.roomId,
+        p_host_token: opts.hostToken,
+      });
+    }
+    if (typeof fetch !== "undefined") {
+      void fetch("/api/rooms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: opts.roomId, hostToken: opts.hostToken }),
+      }).catch(() => undefined);
+    }
   }, 20_000);
 
   const doSyncViewers = (count: number) => {
     lastSentViewers = count;
-    void client.rpc("update_viewers", {
-      p_room_id: opts.roomId,
-      p_host_token: opts.hostToken,
-      p_viewers: count,
-    });
+    if (client) {
+      void client.rpc("update_viewers", {
+        p_room_id: opts.roomId,
+        p_host_token: opts.hostToken,
+        p_viewers: count,
+      });
+    }
+    if (typeof fetch !== "undefined") {
+      void fetch("/api/rooms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: opts.roomId, hostToken: opts.hostToken, viewers: count }),
+      }).catch(() => undefined);
+    }
+    try {
+      const raw = localStorage.getItem("ping:active_rooms");
+      if (raw) {
+        const list = JSON.parse(raw) as (Room & { createdAt?: number })[];
+        const target = list.find((r) => r.id === opts.roomId);
+        if (target) {
+          target.viewers = count;
+          localStorage.setItem("ping:active_rooms", JSON.stringify(list));
+        }
+      }
+    } catch {}
   };
 
   const syncViewers = (count: number) => {
@@ -320,7 +346,7 @@ export function startHostLifecycle(opts: {
 
   // Encerramento ao sair da página (sendBeacon / RPC)
   const closeRoom = () => {
-    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    if (client && SUPABASE_URL && SUPABASE_ANON_KEY) {
       const endpoint = `${SUPABASE_URL}/rest/v1/rpc/close_room`;
       const body = JSON.stringify({ p_room_id: opts.roomId, p_host_token: opts.hostToken });
       try {
@@ -329,11 +355,27 @@ export function startHostLifecycle(opts: {
       } catch {
         // Fallback síncrono ou ignorar se browser bloquear
       }
+      void client.rpc("close_room", {
+        p_room_id: opts.roomId,
+        p_host_token: opts.hostToken,
+      });
     }
-    void client.rpc("close_room", {
-      p_room_id: opts.roomId,
-      p_host_token: opts.hostToken,
-    });
+
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon(`/api/rooms?id=${encodeURIComponent(opts.roomId)}`);
+      } else {
+        void fetch(`/api/rooms?id=${encodeURIComponent(opts.roomId)}`, { method: "DELETE" }).catch(() => undefined);
+      }
+    } catch {}
+
+    try {
+      const raw = localStorage.getItem("ping:active_rooms");
+      if (raw) {
+        const list = JSON.parse(raw) as { id: string }[];
+        localStorage.setItem("ping:active_rooms", JSON.stringify(list.filter((r) => r.id !== opts.roomId)));
+      }
+    } catch {}
   };
 
   window.addEventListener("beforeunload", closeRoom);
@@ -346,10 +388,7 @@ export function startHostLifecycle(opts: {
       if (viewerThrottleTimer !== null) window.clearTimeout(viewerThrottleTimer);
       window.removeEventListener("beforeunload", closeRoom);
       window.removeEventListener("pagehide", closeRoom);
-      void client.rpc("close_room", {
-        p_room_id: opts.roomId,
-        p_host_token: opts.hostToken,
-      });
+      closeRoom();
     },
   };
 }

@@ -395,3 +395,22 @@ Para oferecer paridade completa com a experiência de transmissão de tela do Di
   - Executado automaticamente dentro de `admitViewer()` quando um novo espectador conecta na transmissão, acompanhado por notificação visual Toast ("Um novo espectador entrou na transmissão! 🔔").
   - Zero arquivos de áudio externos, garantindo 100% de conformidade com a rigorosa CSP da aplicação (`media-src 'self' blob: mediastream:`).
 
+---
+
+## 24. Persistência de Salas no Lobby, Vercel Blob e Sincronização em Tempo Real
+
+- **Causa Raiz Identificada**:
+  - O catálogo de salas operava puramente em memória RAM na instância do cliente. Ao clicar em "Salas" na navegação ou abrir uma nova aba, o estado era reiniciado em `[]`, fazendo as salas recém-criadas desaparecerem.
+- **Armazenamento e Sincronização Híbrida (`src/app/services/rooms.ts` & `api/rooms.ts`)**:
+  - Implementada persistência síncrona em `localStorage` (`ping:active_rooms`) e canal em tempo real entre abas via `BroadcastChannel` nativo (`ping:room_sync_v1`), garantindo persistência imediata mesmo ao recarregar ou trocar de aba.
+  - Conexão e integração com Vercel Blob (`store_EwVMJBf7e8Husqyf`) através da API `/api/rooms`:
+    - `GET /api/rooms`: sincroniza o catálogo com salas criadas por outros navegadores e computadores.
+    - `POST /api/rooms`: propaga salas recém-criadas para a nuvem.
+    - `PATCH /api/rooms`: mantém heartbeat a cada 20s e atualiza o número de espectadores em tempo real.
+    - `DELETE /api/rooms`: remove a sala do catálogo ao encerrar a transmissão ou fechar a aba (`beforeunload`).
+- **Navegação SPA sem Perda de Estado (`src/app/app.ts`)**:
+  - `showLobby()` atualizado para alternar de volta ao lobby sem executar recarregamento de página (`window.location.assign`) quando o anfitrião não iniciou a captura de tela, exibindo imediatamente a sala criada sob "Salas Abertas" ou "Salas Fechadas".
+- **Prevenção de Race Condition e Limite Global**:
+  - `MockRoomService.create()` atualizado com reserva atômica de slots (`pendingOpen`), respeitando estritamente o limite de no máximo 2 salas abertas mesmo sob estresse de chamadas concorrentes.
+
+

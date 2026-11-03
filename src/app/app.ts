@@ -1,4 +1,4 @@
-﻿
+
 import { toast } from "../ui";
 import {
   AdSlot,
@@ -60,11 +60,19 @@ export function mountApp(root: HTMLElement): void {
     if (view === "host") {
       const broadcasting = hostView.querySelector<HTMLElement>("#live:not([hidden])");
       if (broadcasting && !window.confirm("Encerrar a transmissão atual e voltar às salas?")) return;
-      // O host mantém conexões abertas: recarregar é a forma segura de encerrá-las.
+      if (!broadcasting) {
+        view = "lobby";
+        hostView.hidden = true;
+        lobby.hidden = false;
+        setActive("rooms");
+        void load();
+        return;
+      }
       window.location.assign(window.location.pathname);
       return;
     }
     setActive("rooms");
+    void load();
   };
 
   const showHost = async (password?: string, roomId?: string, hostToken?: string): Promise<void> => {
