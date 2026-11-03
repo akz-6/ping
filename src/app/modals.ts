@@ -1,5 +1,6 @@
 import { Banner } from "./components";
 import { append, h } from "./dom";
+import { getProfile, resetIdentity, saveProfile, type UserProfile } from "./identity";
 import { Avatar, Button, Field, openDialog, setLoading } from "./primitives";
 import {
   MAX_OPEN_ROOMS,
@@ -238,33 +239,52 @@ function radioGroup<T extends string>(
   );
 }
 
-export function openProfileModal(opts: { handle: string }): void {
-  const connect = Button("Conectar com Discord", { variant: "discord", block: true });
-  const nick = Field({ label: "Apelido de exibição", placeholder: "Disponível após conectar", maxLength: 32 });
-  const full = Field({ label: "Nome completo", placeholder: "Disponível após conectar", maxLength: 80 });
-  nick.setDisabled(true);
-  full.setDisabled(true);
+export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfile) => void }): void {
+  const profile = getProfile();
+
+  const connect = Button(
+    profile.discordLinked ? "Discord Conectado ✓" : "Conectar com Discord (Opcional)",
+    { variant: "discord", block: true },
+  );
+
+  const nick = Field({
+    label: "Apelido de exibição",
+    placeholder: "Ex: Seu Apelido ou Nome Social",
+    maxLength: 32,
+  });
+  nick.input.value = profile.displayName !== profile.handle ? profile.displayName : "";
+
+  const full = Field({
+    label: "Nome completo",
+    placeholder: "Ex: Carlos Eduardo da Silva",
+    maxLength: 80,
+  });
+  full.input.value = profile.fullName;
 
   const close = Button("Fechar", { variant: "secondary" });
-  const save = Button("Salvar");
-  save.disabled = true;
+  const save = Button("Salvar", { variant: "primary" });
+  const resetBtn = Button("Redefinir dados", { variant: "secondary" });
+
+  const avatarWrap = h("div", { class: "profile-avatar-wrap" }, Avatar(profile.displayName, 72));
+  const handleLabel = h("p", { class: "profile-handle" }, profile.displayName);
+  const badgeLabel = h("span", { class: "profile-badge" }, profile.discordLinked ? "Discord" : (profile.displayName === profile.handle ? "Anônimo" : "Personalizado"));
 
   const header = h(
     "div",
     { class: "profile-head" },
-    Avatar(opts.handle, 72),
+    avatarWrap,
     h(
       "div",
       { class: "profile-head-text" },
-      h("p", { class: "profile-handle" }, opts.handle),
-      h("span", { class: "profile-badge" }, "Anônimo"),
+      handleLabel,
+      badgeLabel,
     ),
   );
 
   const note = h(
     "p",
     { class: "field-hint" },
-    "Seus dados só são salvos na nuvem depois de conectar com o Discord.",
+    "Nome e apelido são salvos localmente no seu dispositivo. O login com Discord é opcional.",
   );
 
   const appearance = radioGroup<ThemeChoice>(
@@ -289,18 +309,41 @@ export function openProfileModal(opts: { handle: string }): void {
   const body = h("div", { class: "dialog-form" });
   append(body, [
     header,
-    connect,
-    note,
     nick.el,
     full.el,
+    connect,
+    note,
     appearance,
     palette,
-    h("div", { class: "dialog-actions" }, close, save),
+    h("div", { class: "dialog-actions" }, resetBtn, close, save),
   ]);
 
   const dlg = openDialog({ title: "Seu perfil", body: [body] });
+
   close.addEventListener("click", () => dlg.close());
+
+  save.addEventListener("click", () => {
+    const updated = saveProfile({
+      displayName: nick.input.value,
+      fullName: full.input.value,
+    });
+    opts.onSaved?.(updated);
+    toast("Perfil atualizado com sucesso!");
+    dlg.close();
+  });
+
+  resetBtn.addEventListener("click", () => {
+    const fresh = resetIdentity();
+    nick.input.value = "";
+    full.input.value = "";
+    handleLabel.textContent = fresh.displayName;
+    avatarWrap.replaceChildren(Avatar(fresh.displayName, 72));
+    badgeLabel.textContent = "Anônimo";
+    opts.onSaved?.(fresh);
+    toast("Identidade local redefinida.");
+  });
+
   connect.addEventListener("click", () => {
-    toast("O login com Discord chega na próxima fase (L3).");
+    toast("Vínculo com Discord (opcional) disponível.");
   });
 }

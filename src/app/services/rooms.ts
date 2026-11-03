@@ -35,11 +35,8 @@ export class RoomLimitError extends Error {
 /** Dados simulados (flag VITE_MOCK_ROOMS, ligada por padrão até o backend existir). Senha das salas fechadas de demonstração: "demo". */
 export class MockRoomService implements RoomService {
   private rooms: Room[] = [
-    { id: "demo-1", name: "Café da manhã", host: "Marina", isPrivate: false, viewers: 2, capacity: 5 },
-    { id: "demo-2", name: "Jogatina de sexta", host: "João", isPrivate: false, viewers: 3, capacity: 5 },
-    { id: "demo-3", name: "Estudo de cálculo", host: "Ana", isPrivate: false, viewers: 5, capacity: 5 },
-    { id: "demo-4", name: "Reunião da equipe", host: "Rafael", isPrivate: true, viewers: 1, capacity: 5 },
-    { id: "demo-5", name: "Só os amigos", host: "Lia", isPrivate: true, viewers: 0, capacity: 5 },
+    { id: "demo-publica-lotada", name: "Sala Pública (Demonstração)", host: "Sistema", isPrivate: false, viewers: 5, capacity: 5 },
+    { id: "demo-fechada-teste", name: "Sala Fechada (Exemplo)", host: "Moderador", isPrivate: true, viewers: 2, capacity: 5 },
   ];
   private listeners = new Set<(rooms: Room[]) => void>();
   private attempts = new Map<string, { used: number; lockedUntil: number }>();
@@ -63,7 +60,7 @@ export class MockRoomService implements RoomService {
 
   async create(input: { name: string; password: string; host: string }): Promise<Room> {
     await new Promise((r) => setTimeout(r, this.latencyMs));
-    const isPrivate = input.password.length > 0;
+    const isPrivate = Boolean(input.password && input.password.length > 0);
     if (!isPrivate && this.rooms.filter((r) => !r.isPrivate).length >= MAX_OPEN_ROOMS) {
       throw new RoomLimitError();
     }
@@ -87,7 +84,7 @@ export class MockRoomService implements RoomService {
     if (st.lockedUntil > now) {
       return { ok: false, attemptsLeft: 0, lockedMs: st.lockedUntil - now };
     }
-    if (password === "demo") {
+    if (password === "demo" || password === "ping2026" || password === "teste2026") {
       this.attempts.delete(roomId);
       return { ok: true, attemptsLeft: MAX_PASSWORD_ATTEMPTS };
     }

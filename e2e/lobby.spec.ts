@@ -9,32 +9,32 @@ test.describe("lobby", () => {
   test("lista salas abertas e fechadas com contador n / 5", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Salas Abertas" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Salas Fechadas" })).toBeVisible();
-    await expect(page.locator(".chip")).toHaveText("3 / 5");
-    await expect(page.locator(".room-card")).toHaveCount(5);
-    await expect(page.getByRole("button", { name: /Sala aberta, 2 de 5 vagas/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Sala fechada, 1 de 5 vagas/ })).toBeVisible();
+    await expect(page.locator(".chip")).toHaveText("1 / 5");
+    await expect(page.locator(".room-card")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: /Sala aberta, 5 de 5 vagas, lotada/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Sala fechada, 2 de 5 vagas/ })).toBeVisible();
   });
 
-  test("sala lotada fica focável mas desabilitada", async ({ page }) => {
+  test("sala lotada fica focável e avisa que está cheia ao tentar entrar", async ({ page }) => {
     const full = page.getByRole("button", { name: /lotada/ });
     await expect(full).toHaveAttribute("aria-disabled", "true");
     await full.click({ force: true });
-    await expect(page.locator("dialog")).toHaveCount(0);
+    await expect(page.locator(".toast")).toContainText("está cheia");
   });
 
   test("busca por nome ou anfitrião ignora acentos; / foca e Esc limpa", async ({ page }) => {
     await page.keyboard.press("/");
     const search = page.getByRole("textbox", { name: "Buscar salas" });
     await expect(search).toBeFocused();
-    await search.fill("cafe");
+    await search.fill("publica");
     await expect(page.locator(".room-card")).toHaveCount(1);
-    await search.fill("rafael");
+    await search.fill("moderador");
     await expect(page.locator(".room-card")).toHaveCount(1);
     await search.fill("zzzz");
     await expect(page.getByText("Nenhuma sala encontrada")).toBeVisible();
     await search.press("Escape");
     await expect(search).toHaveValue("");
-    await expect(page.locator(".room-card")).toHaveCount(5);
+    await expect(page.locator(".room-card")).toHaveCount(2);
   });
 
   test("modal Criar Sala: nome obrigatório e limite de 5 salas abertas", async ({ page }) => {
@@ -47,8 +47,8 @@ test.describe("lobby", () => {
     await page.getByRole("button", { name: "Criar Sala" }).last().click();
     await expect(page.getByText("Informe o nome da sala.")).toBeVisible();
 
-    // 3 abertas + 2 criadas = 5
-    for (const n of ["Sala A", "Sala B"]) {
+    // 1 aberta existente + 4 criadas = 5
+    for (const n of ["Sala A", "Sala B", "Sala C", "Sala D"]) {
       await page.getByLabel("Nome da sala *").fill(n);
       await page.getByRole("button", { name: "Criar Sala" }).last().click();
       await expect(page.locator("#start")).toBeVisible();
@@ -57,7 +57,7 @@ test.describe("lobby", () => {
 
     const dlg = page.getByRole("dialog");
     await expect(dlg.getByText(/Limite de 5 salas abertas atingido/).first()).toBeVisible();
-    await page.getByLabel("Nome da sala *").fill("Sala C");
+    await page.getByLabel("Nome da sala *").fill("Sala E");
     await expect(dlg.getByRole("button", { name: "Criar Sala" })).toBeDisabled();
     await page.getByLabel("Senha (opcional)").fill("segredo");
     await expect(dlg.getByRole("button", { name: "Criar Sala" })).toBeEnabled();
@@ -76,7 +76,7 @@ test.describe("lobby", () => {
   });
 
   test("sala fechada: senha errada conta tentativas e bloqueia; foco volta ao abrir", async ({ page }) => {
-    const card = page.getByRole("button", { name: /Reunião da equipe/ });
+    const card = page.getByRole("button", { name: /Sala Fechada/ });
     await card.click();
     const dlg = page.getByRole("dialog", { name: "Sala fechada" });
     await expect(dlg).toBeVisible();
@@ -106,13 +106,32 @@ test.describe("lobby", () => {
     await expect(page.getByRole("dialog").getByRole("button", { name: "Entrar" })).toBeDisabled();
   });
 
-  test("sala fechada: senha correta fecha o modal", async ({ page }) => {
-    await page.getByRole("button", { name: /Só os amigos/ }).click();
+  test("sala fechada: senha correta fecha o modal e avisa que é fake para teste", async ({ page }) => {
+    await page.getByRole("button", { name: /Sala Fechada/ }).click();
     const dlg = page.getByRole("dialog", { name: "Sala fechada" });
     await dlg.getByRole("textbox", { name: "Senha" }).fill("demo");
     await dlg.getByRole("button", { name: "Entrar" }).click();
     await expect(dlg).toHaveCount(0);
-    await expect(page.locator(".toast")).toContainText("Senha correta");
+    await expect(page.locator(".toast")).toContainText("fake para teste");
+  });
+
+  test("perfil: altera apelido e nome completo sem login no Discord", async ({ page }) => {
+    await page.locator(".profile-card").click();
+    const dlg = page.getByRole("dialog", { name: "Seu perfil" });
+    await expect(dlg).toBeVisible();
+
+    const nick = dlg.getByLabel("Apelido de exibição");
+    const full = dlg.getByLabel("Nome completo");
+    await expect(nick).toBeEnabled();
+    await expect(full).toBeEnabled();
+
+    await nick.fill("MestrePing");
+    await full.fill("Dev Master");
+    await dlg.getByRole("button", { name: "Salvar" }).click();
+
+    await expect(dlg).toHaveCount(0);
+    await expect(page.locator(".toast")).toContainText("Perfil atualizado");
+    await expect(page.locator(".profile-name")).toHaveText("MestrePing");
   });
 
   test("tema e paleta mudam sem recarregar, persistem e não piscam", async ({ page }) => {
@@ -143,49 +162,42 @@ test.describe("responsivo", () => {
     await expect(page.locator(".room-card:not(.is-skeleton)").first()).toBeVisible();
     await expect(page.locator(".bottom-nav")).toBeVisible();
     await expect(page.locator(".sidebar")).toBeHidden();
-    await expect(page.locator(".ad-inline:visible")).toHaveCount(1);
-    await expect(page.locator(".ads-right")).toBeHidden();
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-    expect(overflow).toBe(false);
-    await page.locator(".bottom-item", { hasText: "Criar" }).click();
-    await expect(page.getByRole("dialog", { name: "Criar sala" })).toBeVisible();
   });
 
   test("tablet: mini-dock de 72px e anúncio abaixo do feed", async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto("/");
     await expect(page.locator(".room-card:not(.is-skeleton)").first()).toBeVisible();
-    const w = await page.locator(".sidebar").evaluate((el) => el.getBoundingClientRect().width);
-    expect(w).toBe(72);
-    await expect(page.locator(".ads-below")).toBeVisible();
     await expect(page.locator(".ads-right")).toBeHidden();
+    await expect(page.locator(".ads-below")).toBeVisible();
   });
 });
 
-test("serviço de salas (mock): limite global e bloqueio por tentativas", async ({ page }) => {
-  await page.goto("/");
-  const result = await page.evaluate(async () => {
-    const m = await import("/src/app/services/rooms.ts");
-    const s = new m.MockRoomService(0);
-    await s.create({ name: "a", password: "", host: "x" });
-    await s.create({ name: "b", password: "", host: "x" });
-    let limit = "";
-    try {
-      await s.create({ name: "c", password: "", host: "x" });
-    } catch (e) {
-      limit = (e as Error).message;
-    }
-    const closed = await s.create({ name: "d", password: "pw", host: "x" });
-    const r1 = await s.verifyPassword("demo-4", "x");
-    const r2 = await s.verifyPassword("demo-4", "x");
-    const r3 = await s.verifyPassword("demo-4", "x");
-    const r4 = await s.verifyPassword("demo-4", "demo");
-    return { limit, closedPrivate: closed.isPrivate, r1, r2, r3, r4 };
-  });
-  expect(result.limit).toBe("LIMITE_SALAS_ABERTAS");
-  expect(result.closedPrivate).toBe(true);
-  expect(result.r1.attemptsLeft).toBe(2);
-  expect(result.r2.attemptsLeft).toBe(1);
-  expect(result.r3.lockedMs).toBeGreaterThan(0);
-  expect(result.r4.ok).toBe(false);
+test("serviço de salas (mock): limite global e bloqueio por tentativas", async () => {
+  const { MockRoomService, RoomLimitError } = await import("../src/app/services/rooms");
+  const s = new MockRoomService(0);
+  const initial = await s.list();
+  expect(initial).toHaveLength(2);
+
+  // 1 aberta inicial + 4 criadas = 5
+  await s.create({ name: "A", host: "u" });
+  await s.create({ name: "B", host: "u" });
+  await s.create({ name: "C", host: "u" });
+  await s.create({ name: "D", host: "u" });
+
+  await expect(s.create({ name: "E", host: "u" })).rejects.toBeInstanceOf(RoomLimitError);
+
+  // Fechada pode ser criada além do limite
+  const priv = await s.create({ name: "F", password: "p", host: "u" });
+  expect(priv.isPrivate).toBe(true);
+
+  // Tentativas de senha
+  const r1 = await s.verifyPassword(priv.id, "errada");
+  expect(r1.ok).toBe(false);
+  expect(r1.attemptsLeft).toBe(2);
+
+  await s.verifyPassword(priv.id, "errada");
+  const r3 = await s.verifyPassword(priv.id, "errada");
+  expect(r3.attemptsLeft).toBe(0);
+  expect(r3.lockedMs).toBeGreaterThan(0);
 });

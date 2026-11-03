@@ -14,6 +14,7 @@ const NAV_ITEMS: { id: NavId; label: string; icon: string }[] = [
 export interface SidebarApi {
   el: HTMLElement;
   setActive(id: NavId): void;
+  updateProfile(p: { displayName: string; handle: string; discordLinked?: boolean }): void;
 }
 
 export function SidebarNav(opts: {
@@ -34,6 +35,21 @@ export function SidebarNav(opts: {
       icon(it.icon, 20),
       h("span", { class: "nav-label" }, it.label),
     ),
+  );
+
+  const avatarWrap = h("span", { class: "profile-avatar-wrap" }, Avatar(opts.handle, 36));
+  const nameEl = h("span", { class: "profile-name" }, opts.handle);
+  const badgeEl = h("span", { class: "profile-badge" }, "Anônimo");
+  const profileBtn = h(
+    "button",
+    {
+      type: "button",
+      class: "profile-card",
+      "aria-label": `Abrir perfil de ${opts.handle}`,
+      onClick: () => opts.onNavigate("profile"),
+    },
+    avatarWrap,
+    h("span", { class: "profile-text" }, nameEl, badgeEl),
   );
 
   const el = h(
@@ -58,23 +74,20 @@ export function SidebarNav(opts: {
       h("span", { class: "btn-label" }, "Criar Sala"),
     ),
     h("nav", { class: "nav-list", "aria-label": "Principal" }, ...items),
-    h(
-      "button",
-      {
-        type: "button",
-        class: "profile-card",
-        "aria-label": `Abrir perfil de ${opts.handle}`,
-        onClick: () => opts.onNavigate("profile"),
-      },
-      Avatar(opts.handle, 36),
-      h(
-        "span",
-        { class: "profile-text" },
-        h("span", { class: "profile-name" }, opts.handle),
-        h("span", { class: "profile-badge" }, "Anônimo"),
-      ),
-    ),
+    profileBtn,
   );
+
+  const updateProfile = (p: { displayName: string; handle: string; discordLinked?: boolean }) => {
+    profileBtn.setAttribute("aria-label", `Abrir perfil de ${p.displayName}`);
+    avatarWrap.replaceChildren(Avatar(p.displayName, 36));
+    nameEl.textContent = p.displayName;
+    badgeEl.textContent = p.discordLinked ? "Discord" : (p.displayName === p.handle ? "Anônimo" : "Personalizado");
+  };
+
+  window.addEventListener("ping:profile-updated", (e: Event) => {
+    const custom = e as CustomEvent<{ displayName: string; handle: string; discordLinked?: boolean }>;
+    if (custom.detail) updateProfile(custom.detail);
+  });
 
   return {
     el,
@@ -85,6 +98,7 @@ export function SidebarNav(opts: {
         else b.removeAttribute("aria-current");
       });
     },
+    updateProfile,
   };
 }
 
@@ -135,7 +149,7 @@ export function RoomCard(room: Room, onSelect: (room: Room) => void): HTMLElemen
       "aria-label": `${describeRoom(room)}. ${room.name}, sala de ${room.host}`,
       "aria-disabled": full ? "true" : undefined,
       onClick: () => {
-        if (!full) onSelect(room);
+        onSelect(room);
       },
     },
     Avatar(room.host, 40),

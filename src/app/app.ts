@@ -13,7 +13,7 @@ import {
   type NavId,
 } from "./components";
 import { h, normalize } from "./dom";
-import { getHandle } from "./identity";
+import { getHandle, getProfile } from "./identity";
 import { openCreateRoomModal, openPasswordModal, openProfileModal } from "./modals";
 import { isCreatorAuthorized, openTestingNoticeModal } from "./auth-gate";
 import { MAX_OPEN_ROOMS, createRoomService, type Room } from "./services/rooms";
@@ -23,7 +23,7 @@ type Status = "loading" | "ready" | "error";
 
 export function mountApp(root: HTMLElement): void {
   const service = createRoomService();
-  const handle = getHandle();
+  const handle = getProfile().displayName || getHandle();
 
   let rooms: Room[] = [];
   let status: Status = "loading";
@@ -83,27 +83,40 @@ export function mountApp(root: HTMLElement): void {
   };
 
   const onSelect = (room: Room): void => {
+    if (room.viewers >= room.capacity) {
+      toast(`A sala "${room.name}" está cheia (5 / 5 vagas ocupadas).`, "info");
+      return;
+    }
+
     const enter = () => {
       location.href = `/?room=${encodeURIComponent(room.id)}`;
     };
+
     if (room.isPrivate) {
       openPasswordModal({
         room,
         verify: (pw) => service.verifyPassword(room.id, pw),
         onSuccess: () => {
-          toast("Senha correta. Conectando à sala...");
-          if (isSupabaseConfigured()) enter();
+          if (room.id === "demo-fechada-teste" || !isSupabaseConfigured()) {
+            toast("Senha correta. Esta é uma sala fake para teste.", "info");
+          } else {
+            toast("Senha correta. Conectando à sala...");
+            enter();
+          }
         },
       });
     } else {
-      if (isSupabaseConfigured()) enter();
-      else toast(`Conectando à sala ${room.name}...`);
+      if (room.id === "demo-publica-lotada" || !isSupabaseConfigured()) {
+        toast(`A sala "${room.name}" é uma sala de demonstração.`);
+      } else {
+        enter();
+      }
     }
   };
 
   const navigate = (id: NavId): void => {
     if (id === "create") onCreate();
-    else if (id === "profile") openProfileModal({ handle });
+    else if (id === "profile") openProfileModal({ handle, onSaved: (p) => sidebar.updateProfile(p) });
     else showLobby();
   };
 

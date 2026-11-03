@@ -133,4 +133,20 @@ A política de segurança restritiva definida no `vercel.json` (`script-src 'sel
   - **Desbloqueio Manual**: O modal de aviso oferece a opção discreta *"Acesso do desenvolvedor / anfitrião"*, permitindo digitar a chave mestra para autorização imediata.
   - **Ambiente Local**: Máquinas em `localhost` permanecem autorizadas nativamente para testes e desenvolvimento contínuo.
 
+---
+
+## 11. Identidade Híbrida e Salas de Demonstração (Fase L3)
+
+- **Edição de Perfil Sem Exigência de Discord**:
+  - Remoção do bloqueio que exigia autenticação prévia com Discord para edição de apelido de exibição e nome completo.
+  - Usuários podem editar e salvar seu apelido e nome completo diretamente no modal de perfil, persistindo em `localStorage` e refletindo de imediato no cartão da sidebar e na criação de salas.
+  - O botão de conexão com o Discord permanece disponível como integração opcional de nuvem.
+  - Botão de redefinição de dados locais (`resetIdentity`) permitindo ao usuário apagar seu histórico e gerar um novo identificador anônimo a qualquer momento (em conformidade com a LGPD).
+- **Catálogo de Salas de Demonstração Limpo**:
+  - As salas mock antigas foram removidas.
+  - O catálogo agora conta exclusivamente com duas salas de exemplo:
+    1. **Sala Fechada (Exemplo)**: Exibe ocupação `2 / 5`. Ao digitar a senha de teste, exibe aviso: *"Esta é uma sala fake para teste."*
+    2. **Sala Pública (Demonstração)**: Exibe status `5 / 5 Lotada`. Ao clicar para tentar entrar, notifica imediatamente: *"A sala está cheia (5 / 5 vagas ocupadas)."*
+
+
 

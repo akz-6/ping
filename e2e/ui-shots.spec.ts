@@ -46,7 +46,7 @@ for (const theme of themes) {
     await page.locator("#sidebar-create").click();
     await page.locator("dialog").screenshot({ path: `${dir}/modal-criar-${theme}.png` });
     await page.keyboard.press("Escape");
-    await page.locator('.room-card:has-text("Reunião da equipe")').click();
+    await page.locator('.room-card:has-text("Sala Fechada")').click();
     await page.locator("dialog").screenshot({ path: `${dir}/modal-senha-${theme}.png` });
     await page.keyboard.press("Escape");
     await page.locator(".profile-card").click();
