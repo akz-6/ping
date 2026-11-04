@@ -18,26 +18,36 @@ const BLOB_FILENAME = "rooms-catalog.json";
 const MAX_STALE_MS = 60_000; // 60 segundos sem heartbeat considera inativa
 const MAX_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 horas máximo de vida útil da sala
 
+let memoryRooms: StoredRoom[] | null = null;
+let lastMemoryUpdate = 0;
+
 async function getStoredRooms(): Promise<StoredRoom[]> {
+  const now = Date.now();
+  if (memoryRooms && now - lastMemoryUpdate < 2000) {
+    return memoryRooms.filter((r) => now - r.updatedAt < MAX_STALE_MS && now - r.createdAt < MAX_LIFETIME_MS);
+  }
+
   try {
     const { blobs } = await list({ prefix: BLOB_FILENAME });
-    if (!blobs || blobs.length === 0) return [];
+    if (!blobs || blobs.length === 0) return memoryRooms || [];
     const target = blobs.find((b) => b.pathname === BLOB_FILENAME) ?? blobs[0];
-    const cacheKey = target.uploadedAt ? new Date(target.uploadedAt).getTime() : Date.now();
-    const fetchUrl = `${target.url}?v=${cacheKey}`;
+    const fetchUrl = `${target.url}?t=${Date.now()}`;
     const res = await fetch(fetchUrl, { cache: "no-store" });
-    if (!res.ok) return [];
+    if (!res.ok) return memoryRooms || [];
     const stored = (await res.json()) as StoredRoom[];
-    const now = Date.now();
+    memoryRooms = stored;
+    lastMemoryUpdate = Date.now();
     return stored.filter((r) => now - r.updatedAt < MAX_STALE_MS && now - r.createdAt < MAX_LIFETIME_MS);
   } catch (err) {
     console.error("Erro ao obter salas do Blob:", err);
-    return [];
+    return memoryRooms || [];
   }
 }
 
 async function saveStoredRooms(rooms: StoredRoom[]): Promise<void> {
   const clean = rooms.slice(-20);
+  memoryRooms = clean;
+  lastMemoryUpdate = Date.now();
   await put(BLOB_FILENAME, JSON.stringify(clean), {
     access: "public",
     addRandomSuffix: false,
