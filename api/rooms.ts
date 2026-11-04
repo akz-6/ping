@@ -23,7 +23,9 @@ async function getStoredRooms(): Promise<StoredRoom[]> {
     const { blobs } = await list({ prefix: BLOB_FILENAME });
     if (!blobs || blobs.length === 0) return [];
     const target = blobs.find((b) => b.pathname === BLOB_FILENAME) ?? blobs[0];
-    const res = await fetch(target.url, { cache: "no-store" });
+    const cacheKey = target.uploadedAt ? new Date(target.uploadedAt).getTime() : Date.now();
+    const fetchUrl = `${target.url}?v=${cacheKey}`;
+    const res = await fetch(fetchUrl, { cache: "no-store" });
     if (!res.ok) return [];
     const stored = (await res.json()) as StoredRoom[];
     const now = Date.now();
