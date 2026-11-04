@@ -1,4 +1,4 @@
-﻿import { Peer, type DataConnection, type MediaConnection } from "peerjs";
+import { Peer, type DataConnection, type MediaConnection } from "peerjs";
 import {
   CONNECT_TIMEOUT_MS,
   hasTurn,
@@ -737,15 +737,20 @@ export function mountViewer(root: HTMLElement, room: string): void {
 
       call.on("stream", (remote) => {
         if (peer !== p || finished) return;
+        pauseOverlay.hidden = true;
         if (video.srcObject !== remote) {
           video.srcObject = remote;
           syncSoundUi();
         }
-        void video.play().catch(() => {
-          video.muted = true;
-          syncSoundUi();
-          void video.play().catch(() => undefined);
-        });
+        const tryPlay = () => {
+          void video.play().catch(() => {
+            video.muted = true;
+            syncSoundUi();
+            void video.play().catch(() => undefined);
+          });
+        };
+        tryPlay();
+        video.onloadedmetadata = tryPlay;
         gotStream = true;
         everConnected = true;
         reconnectAttempt = 0;

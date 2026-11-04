@@ -788,3 +788,17 @@ body {
 .discord-stat-item .stat-val.status-poor {
   color: var(--danger);
 }
+
+.screen-share-tip {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 10px 0;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+}
+.screen-share-tip strong {
+  color: var(--text);
+}

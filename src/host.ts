@@ -190,10 +190,10 @@ const TEMPLATE = `
       <div class="grid advanced-grid">
         <label>Preferência de codec
           <select id="codec">
-            <option value="vp9" selected>VP9 → AV1 → H.264 → VP8 (padrão)</option>
+            <option value="h264" selected>H.264 → VP9 → AV1 → VP8 (Hardware acelerado - Recomendado)</option>
+            <option value="vp9">VP9 → AV1 → H.264 → VP8 (Alta compressão)</option>
             <option value="av1">AV1 → VP9 → H.264 → VP8</option>
-            <option value="h264">H.264 → VP9 → AV1 → VP8 (hardware)</option>
-            <option value="vp8">VP8 → H.264 → VP9 → AV1 (compatibilidade)</option>
+            <option value="vp8">VP8 → H.264 → VP9 → AV1 (Compatibilidade)</option>
           </select>
         </label>
         <label>Controle de bitrate
@@ -221,6 +221,7 @@ const TEMPLATE = `
         ? '<span>🛡️ <strong>TURN ativo:</strong> Conexões externas e redes móveis (4G/5G) habilitadas.</span>'
         : '<span>⚠️ <strong>Aviso de Rede:</strong> TURN não configurado. Funciona na mesma rede/Wi-Fi. Conexões em 4G/5G ou CGNAT exigem servidor TURN.</span>'}
     </div>
+    <p class="muted screen-share-tip">💡 <strong>Dica contra tela preta:</strong> Para transmitir jogos, Discord, Spotify ou navegadores sem tela preta, compartilhe <strong>Tela inteira</strong> ou desative a aceleração de hardware no app compartilhado.</p>
     <p class="warn" id="setup-capacity-warn" role="status" hidden></p>
     <button id="start" type="button" class="primary">Iniciar transmissão</button>
     <p class="warn" id="unsupported" hidden>Este navegador não consegue compartilhar a tela. Use Chrome, Edge ou Firefox no computador. Quem só assiste pode usar qualquer navegador.</p>
@@ -822,9 +823,11 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       send(entry.conn, { t: "pause", paused: false });
     }
 
-    preview.srcObject = captured;
-    void preview.play().catch(() => undefined);
     hostStoppedOverlay.hidden = true;
+    preview.srcObject = stream;
+    const tryResumePlay = () => { void preview.play().catch(() => undefined); };
+    tryResumePlay();
+    preview.onloadedmetadata = tryResumePlay;
     isLiveActive = true;
     stopStreamBtn.textContent = "⏹️ Parar Live";
     stopStreamBtn.classList.remove("active");
@@ -926,14 +929,17 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       if (peer !== p) return;
       clearStartTimeout();
       linkInput.value = `${location.origin}${location.pathname}?room=${openedId}`;
-      preview.srcObject = captured;
-      void preview.play().catch(() => undefined);
       setup.hidden = true;
       live.hidden = false;
+      hostStoppedOverlay.hidden = true;
+      hostPausedOverlay.hidden = true;
+      preview.srcObject = stream;
+      const tryHostPlay = () => { void preview.play().catch(() => undefined); };
+      tryHostPlay();
+      preview.onloadedmetadata = tryHostPlay;
       updateVisibilityUi();
       updatePasswordUi();
       isLiveActive = true;
-      hostStoppedOverlay.hidden = true;
       stopStreamBtn.textContent = "⏹️ Parar Live";
       stopStreamBtn.classList.remove("active");
       const token = mountOpts.hostToken || sessionStorage.getItem("ping:host_token:" + openedId) || "";
@@ -1062,7 +1068,12 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           return;
         }
 
-        const call = p.call(conn.peer, captured, {
+        if (!stream) {
+          conn.close();
+          return;
+        }
+
+        const call = p.call(conn.peer, stream, {
           metadata: { room: id },
           sdpTransform: (sdp: string) =>
             preferVideoCodecsInSdp(sdp, codecOrder),

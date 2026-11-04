@@ -1,13 +1,13 @@
-﻿import type { QualityLimitationReason } from "./stats";
+import type { QualityLimitationReason } from "./stats";
 
 export type ContentHint = "motion" | "detail";
 export type VideoCodec = "VP9" | "AV1" | "H264" | "VP8";
 export type CodecPreset = "vp9" | "av1" | "h264" | "vp8";
 
 export const CODEC_PRESETS: Record<CodecPreset, readonly VideoCodec[]> = {
+  h264: ["H264", "VP9", "AV1", "VP8"],
   vp9: ["VP9", "AV1", "H264", "VP8"],
   av1: ["AV1", "VP9", "H264", "VP8"],
-  h264: ["H264", "VP9", "AV1", "VP8"],
   vp8: ["VP8", "H264", "VP9", "AV1"],
 };
 
@@ -20,12 +20,14 @@ export interface CaptureOptions {
 }
 
 export function captureScreen(o: CaptureOptions): Promise<MediaStream> {
+  const videoConstraints: MediaTrackConstraints = {
+    frameRate: { ideal: o.fps, max: Math.max(o.fps, 60) },
+  };
+  if (o.height && o.height > 0) {
+    videoConstraints.height = { ideal: o.height, max: o.height };
+  }
   return navigator.mediaDevices.getDisplayMedia({
-    video: {
-      frameRate: { ideal: o.fps, max: o.fps },
-      width: { ideal: Math.round((o.height * 16) / 9) },
-      height: { ideal: o.height },
-    },
+    video: videoConstraints,
     audio: o.audio
       ? {
           echoCancellation: false,
@@ -196,11 +198,13 @@ export async function capVideoSender(
       if (!params.encodings || params.encodings.length === 0) {
         params.encodings = [{}];
       }
+      params.encodings[0].active = true;
       params.encodings[0].maxBitrate = kbps * 1000;
       params.encodings[0].maxFramerate = fps;
       if (typeof scaleResolutionDownBy === "number" && scaleResolutionDownBy > 1) {
         params.encodings[0].scaleResolutionDownBy = scaleResolutionDownBy;
       } else {
+        params.encodings[0].scaleResolutionDownBy = 1;
         delete params.encodings[0].scaleResolutionDownBy;
       }
       params.degradationPreference =
