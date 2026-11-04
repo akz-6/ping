@@ -60,15 +60,15 @@ export function mountApp(root: HTMLElement): void {
     if (view === "host") {
       const broadcasting = hostView.querySelector<HTMLElement>("#live:not([hidden])");
       if (broadcasting && !window.confirm("Encerrar a transmissão atual e voltar às salas?")) return;
-      if (!broadcasting) {
-        view = "lobby";
-        hostView.hidden = true;
-        lobby.hidden = false;
-        setActive("rooms");
-        void load();
-        return;
+      const stopBtn = hostView.querySelector<HTMLButtonElement>("#stop");
+      if (stopBtn && broadcasting) {
+        stopBtn.click();
       }
-      window.location.assign(window.location.pathname);
+      view = "lobby";
+      hostView.hidden = true;
+      lobby.hidden = false;
+      setActive("rooms");
+      void load();
       return;
     }
     setActive("rooms");
@@ -81,7 +81,12 @@ export function mountApp(root: HTMLElement): void {
     hostView.hidden = false;
     hostView.replaceChildren();
     const { mountHost } = await import("../host");
-    mountHost(hostView, { password, roomId, hostToken });
+    mountHost(hostView, {
+      password,
+      roomId,
+      hostToken,
+      onExit: () => showLobby(),
+    });
     setActive("create");
     window.scrollTo({ top: 0 });
     document.getElementById("ping-consent-banner")?.remove();

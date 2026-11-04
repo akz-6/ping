@@ -6,6 +6,7 @@ export interface Room {
   name: string;
   host: string;
   isPrivate: boolean;
+  hidden?: boolean;
   viewers: number;
   capacity: number;
   hostToken?: string;
@@ -26,6 +27,7 @@ export interface CreateRoomInput {
   password?: string;
   host: string;
   isOwner?: boolean;
+  hidden?: boolean;
 }
 
 /** Contrato do catálogo de salas. A implementação real (Supabase, fase L2) entra no lugar do mock. */
@@ -33,6 +35,8 @@ export interface RoomService {
   list(): Promise<Room[]>;
   subscribe(cb: (rooms: Room[]) => void): () => void;
   create(input: CreateRoomInput): Promise<Room>;
+  remove?(roomId: string): Promise<void>;
+  updateRoom?(roomId: string, patch: { isPrivate?: boolean; password?: string; hidden?: boolean }): Promise<void>;
   verifyPassword(roomId: string, password: string): Promise<PasswordResult>;
 }
 
@@ -45,7 +49,7 @@ export class RoomLimitError extends Error {
 const STORAGE_ROOMS_KEY = "ping:active_rooms";
 const ROOM_CHANNEL_NAME = "ping:room_sync_v1";
 
-function getLocalActiveRooms(): Room[] {
+function getLocalActiveRooms(): (Room & { createdAt?: number })[] {
   try {
     if (typeof localStorage === "undefined") return [];
     const raw = localStorage.getItem(STORAGE_ROOMS_KEY);
@@ -148,6 +152,37 @@ export class MockRoomService implements RoomService {
     return Array.from(map.values());
   }
 
+  private mergeWithCloud(cloudRooms: Room[]): Room[] {
+    const now = Date.now();
+    // Salas locais mantidas se muito recentes (< 20s, aguardando confirmação do POST na nuvem)
+    const local = getLocalActiveRooms().filter((r) => r.createdAt && now - r.createdAt < 20_000);
+    const map = new Map<string, Room>();
+
+    if (this.loadDemos) {
+      map.set("demo-publica-lotada", {
+        id: "demo-publica-lotada",
+        name: "Sala Pública (Demonstração)",
+        host: "Sistema",
+        isPrivate: false,
+        viewers: 2,
+        capacity: 2,
+      });
+      map.set("demo-fechada-teste", {
+        id: "demo-fechada-teste",
+        name: "Sala Fechada (Exemplo)",
+        host: "Moderador",
+        isPrivate: true,
+        viewers: 1,
+        capacity: 2,
+      });
+    }
+
+    cloudRooms.forEach((r) => map.set(r.id, r));
+    local.forEach((r) => map.set(r.id, r));
+
+    return Array.from(map.values());
+  }
+
   private async syncCloudRooms(): Promise<void> {
     try {
       if (typeof fetch === "undefined") return;
@@ -156,10 +191,16 @@ export class MockRoomService implements RoomService {
       const cloudRooms = (await res.json()) as Room[];
       if (!Array.isArray(cloudRooms)) return;
 
-      const merged = this.mergeWithLocal(cloudRooms);
+      const merged = this.mergeWithCloud(cloudRooms);
       const isDifferent =
         merged.length !== this.rooms.length ||
-        merged.some((r, i) => r.id !== this.rooms[i]?.id || r.viewers !== this.rooms[i]?.viewers);
+        merged.some(
+          (r, i) =>
+            r.id !== this.rooms[i]?.id ||
+            r.viewers !== this.rooms[i]?.viewers ||
+            r.isPrivate !== this.rooms[i]?.isPrivate ||
+            r.hidden !== this.rooms[i]?.hidden,
+        );
 
       if (isDifferent) {
         this.rooms = merged;
@@ -197,16 +238,77 @@ export class MockRoomService implements RoomService {
     };
   }
 
+  async remove(roomId: string): Promise<void> {
+    this.rooms = this.rooms.filter((r) => r.id !== roomId);
+    if (typeof localStorage !== "undefined") {
+      const local = getLocalActiveRooms().filter((r) => r.id !== roomId);
+      saveLocalActiveRooms(local);
+    }
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.removeItem(`ping:room_pw:${roomId}`);
+    }
+    this.emit();
+    this.notifyTabs();
+
+    if (typeof fetch !== "undefined") {
+      void fetch(`/api/rooms?id=${encodeURIComponent(roomId)}`, {
+        method: "DELETE",
+        keepalive: true,
+      }).catch(() => undefined);
+    }
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+      navigator.sendBeacon(`/api/rooms?action=delete&id=${encodeURIComponent(roomId)}`);
+    }
+  }
+
+  async updateRoom(
+    roomId: string,
+    patch: { isPrivate?: boolean; password?: string; hidden?: boolean },
+  ): Promise<void> {
+    const target = this.rooms.find((r) => r.id === roomId);
+    if (target) {
+      if (typeof patch.isPrivate === "boolean") target.isPrivate = patch.isPrivate;
+      if (typeof patch.hidden === "boolean") target.hidden = patch.hidden;
+    }
+    if (typeof localStorage !== "undefined") {
+      const local = getLocalActiveRooms();
+      const lt = local.find((r) => r.id === roomId);
+      if (lt) {
+        if (typeof patch.isPrivate === "boolean") lt.isPrivate = patch.isPrivate;
+        if (typeof patch.hidden === "boolean") lt.hidden = patch.hidden;
+        saveLocalActiveRooms(local);
+      }
+    }
+    if (typeof sessionStorage !== "undefined" && patch.password !== undefined) {
+      if (patch.password) {
+        sessionStorage.setItem(`ping:room_pw:${roomId}`, patch.password);
+      } else {
+        sessionStorage.removeItem(`ping:room_pw:${roomId}`);
+      }
+    }
+    this.emit();
+    this.notifyTabs();
+
+    if (typeof fetch !== "undefined") {
+      void fetch("/api/rooms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: roomId, ...patch }),
+      }).catch(() => undefined);
+    }
+  }
+
   async create(input: CreateRoomInput): Promise<Room> {
     const isPrivate = Boolean(input.password && input.password.length > 0);
-    const openRooms = this.rooms.filter((r) => !r.isPrivate).length;
+    const isHidden = Boolean(input.hidden);
 
-    // Se já tiver 2 salas abertas (incluindo tentativas concorrentes), bloqueia quem não for o dono
-    if (!isPrivate && !input.isOwner && openRooms + this.pendingOpen >= MAX_OPEN_ROOMS) {
+    // Fiscaliza limite de no máximo 2 salas abertas (públicas)
+    const openRoomsCount = this.rooms.filter((r) => !r.isPrivate && !r.hidden).length;
+    if (!isPrivate && !isHidden && !input.isOwner && openRoomsCount + this.pendingOpen >= MAX_OPEN_ROOMS) {
       throw new RoomLimitError();
     }
 
-    if (!isPrivate && !input.isOwner) {
+    if (!isPrivate && !isHidden && !input.isOwner) {
       this.pendingOpen += 1;
     }
 
@@ -221,6 +323,7 @@ export class MockRoomService implements RoomService {
         name: input.name,
         host: input.host,
         isPrivate,
+        hidden: isHidden,
         viewers: 0,
         capacity: 2,
         hostToken,
@@ -247,7 +350,7 @@ export class MockRoomService implements RoomService {
       this.emit();
       this.notifyTabs();
 
-      // Sincroniza em segundo plano com a nuvem (/api/rooms) para que outros usuários e dispositivos vejam a sala
+      // Sincroniza com a nuvem (/api/rooms) para que outros usuários e amigos vejam a sala
       if (typeof fetch !== "undefined") {
         void fetch("/api/rooms", {
           method: "POST",
@@ -257,16 +360,29 @@ export class MockRoomService implements RoomService {
             name: room.name,
             host: room.host,
             isPrivate: room.isPrivate,
+            hidden: room.hidden,
             hostToken: room.hostToken,
             password: input.password,
             isOwner: input.isOwner,
           }),
-        }).catch(() => undefined);
+        })
+          .then(async (res) => {
+            if (!res.ok && res.status === 403) {
+              // Se o limite da nuvem foi atingido, remove localmente
+              this.rooms = this.rooms.filter((r) => r.id !== room.id);
+              if (typeof localStorage !== "undefined") {
+                const local = getLocalActiveRooms().filter((r) => r.id !== room.id);
+                saveLocalActiveRooms(local);
+              }
+              this.emit();
+            }
+          })
+          .catch(() => undefined);
       }
 
       return room;
     } finally {
-      if (!isPrivate && !input.isOwner) {
+      if (!isPrivate && !isHidden && !input.isOwner) {
         this.pendingOpen = Math.max(0, this.pendingOpen - 1);
       }
     }
@@ -290,13 +406,27 @@ export class MockRoomService implements RoomService {
     const savedPw =
       typeof sessionStorage !== "undefined" ? sessionStorage.getItem(`ping:room_pw:${roomId}`) : null;
 
-    if (
-      (savedPw && password === savedPw) ||
+    let isCorrect =
+      (savedPw !== null && password === savedPw) ||
       password === "demo" ||
       password === "ping2026" ||
       password === "teste2026" ||
-      password === "0604"
-    ) {
+      password === "0604";
+
+    // Verifica com o backend na nuvem se não reconheceu localmente
+    if (!isCorrect && typeof fetch !== "undefined") {
+      try {
+        const res = await fetch(
+          `/api/rooms?action=verify&id=${encodeURIComponent(roomId)}&password=${encodeURIComponent(password)}`,
+        );
+        if (res.ok) {
+          const json = (await res.json()) as { ok?: boolean };
+          if (json?.ok) isCorrect = true;
+        }
+      } catch {}
+    }
+
+    if (isCorrect) {
       this.attempts.delete(roomId);
       return { ok: true, attemptsLeft: MAX_PASSWORD_ATTEMPTS };
     }

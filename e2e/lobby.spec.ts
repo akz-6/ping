@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("lobby", () => {
   test.beforeEach(async ({ page }) => {
+    await page.request.post("/api/rooms/reset").catch(() => undefined);
     await page.goto("/?demo=1");
     await expect(page.locator(".room-card:not(.is-skeleton)").first()).toBeVisible();
   });
@@ -79,6 +80,26 @@ test.describe("lobby", () => {
     await page.locator('.nav-item[data-nav="rooms"]').click();
     await expect(page.locator(".lobby")).toBeVisible();
     await expect(page.locator('.room-card:has-text("Minha Transmissao ao Vivo")')).toBeVisible();
+  });
+
+  test("sala encerrada pelo anfitrião desaparece imediatamente do lobby", async ({ page }) => {
+    await page.locator("#sidebar-create").click();
+    await page.getByLabel("Nome da sala *").fill("Sala Para Encerrar");
+    await page.getByRole("button", { name: "Criar Sala" }).last().click();
+    await expect(page.locator("#start")).toBeVisible();
+
+    await page.locator("#start").click();
+    await expect(page.locator("#live")).toBeVisible({ timeout: 15_000 });
+
+    // Host clica em Encerrar
+    await page.locator("#stop").click();
+
+    // Volta ao lobby
+    await page.locator('.nav-item[data-nav="rooms"]').click();
+    await expect(page.locator(".lobby")).toBeVisible();
+
+    // A sala encerrada não deve mais aparecer no lobby
+    await expect(page.locator('.room-card:has-text("Sala Para Encerrar")')).toBeHidden();
   });
 
   test("olho alterna visibilidade da senha com aria-pressed", async ({ page }) => {

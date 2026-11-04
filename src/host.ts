@@ -29,6 +29,7 @@ import {
 } from "./stats";
 import { $, copyText, shortId, toast } from "./ui";
 import { startHostLifecycle, type HostLifecycleHandle } from "./app/services/supabase";
+import type { Room } from "./app/services/rooms";
 
 const STORAGE_UPLOAD_KEY = "ping_upload_mbps";
 const DEFAULT_UPLOAD_MBPS = 50;
@@ -232,6 +233,13 @@ const TEMPLATE = `
       <div id="host-paused-overlay" class="paused-overlay" hidden>
         <span>⏸️ Transmissão Pausada</span>
       </div>
+      <div id="host-stopped-overlay" class="stopped-overlay" hidden>
+        <div class="stopped-box">
+          <p class="stopped-title">⏹️ Transmissão Parada</p>
+          <p class="muted stopped-desc">A sala continua aberta com o mesmo link para os seus amigos!</p>
+          <button id="btn-resume-live" type="button" class="primary sm resume-live-btn">▶️ Iniciar Transmissão</button>
+        </div>
+      </div>
     </div>
     <div class="row">
       <input id="link" readonly aria-label="Link da sala" />
@@ -240,7 +248,13 @@ const TEMPLATE = `
     <div class="row live-toolbar">
       <button id="change-source" type="button" class="btn-discord-tool" title="Trocar janela ou tela compartilhada">🖥️ Trocar Tela</button>
       <button id="pause-stream" type="button" class="btn-discord-tool" title="Pausar ou retomar vídeo da transmissão">⏸️ Pausar Tela</button>
+      <button id="stop-stream" type="button" class="btn-discord-tool" title="Parar transmissão da live mantendo a sala e o link abertos">⏹️ Parar Live</button>
       <button id="mute-audio" type="button" class="btn-discord-tool" title="Silenciar ou ativar áudio da transmissão">🔊 Áudio Ativo</button>
+    </div>
+    <div class="row live-room-settings">
+      <button id="btn-toggle-visibility" type="button" class="btn-discord-pill" title="Alternar se a sala aparece ou não no lobby de salas">👁️ Sala Visível no Lobby</button>
+      <button id="btn-change-password" type="button" class="btn-discord-pill" title="Alterar ou definir a senha desta sala">🔑 Alterar Senha</button>
+      <button id="btn-remove-password" type="button" class="btn-discord-pill" title="Remover a senha e deixar a sala aberta para todos">🔓 Tirar Senha</button>
     </div>
     <div class="row between">
       <div class="live-meta">
@@ -317,7 +331,7 @@ function getPresetParameters(
   }
 }
 
-export function mountHost(root: HTMLElement, mountOpts: { password?: string; roomId?: string; hostToken?: string } = {}): void {
+export function mountHost(root: HTMLElement, mountOpts: { password?: string; roomId?: string; hostToken?: string; hidden?: boolean; onExit?: () => void } = {}): void {
   document.title = "Ping — Compartilhar Tela";
   root.innerHTML = TEMPLATE;
 
@@ -344,10 +358,21 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   const unsupported = $<HTMLElement>(root, "#unsupported");
   const changeSourceBtn = $<HTMLButtonElement>(root, "#change-source");
   const pauseStreamBtn = $<HTMLButtonElement>(root, "#pause-stream");
+  const stopStreamBtn = $<HTMLButtonElement>(root, "#stop-stream");
   const muteAudioBtn = $<HTMLButtonElement>(root, "#mute-audio");
   const hostPausedOverlay = $<HTMLElement>(root, "#host-paused-overlay");
+  const hostStoppedOverlay = $<HTMLElement>(root, "#host-stopped-overlay");
+  const resumeLiveBtn = $<HTMLButtonElement>(root, "#btn-resume-live");
+  const toggleVisibilityBtn = $<HTMLButtonElement>(root, "#btn-toggle-visibility");
+  const changePasswordBtn = $<HTMLButtonElement>(root, "#btn-change-password");
+  const removePasswordBtn = $<HTMLButtonElement>(root, "#btn-remove-password");
+  const hostBackLink = root.querySelector<HTMLAnchorElement>(".host-back-link");
   let isStreamPaused = false;
   let isAudioMuted = false;
+  let isLiveActive = true;
+  let isRoomHidden = Boolean(mountOpts.hidden);
+  let currentPassword = mountOpts.password || passwordInput.value || "";
+  let expectedPwHash: string | null = null;
 
   uploadInput.value = String(readStoredUploadMbps());
   if (mountOpts.password) {
@@ -652,12 +677,38 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   };
 
   const stop = (): void => {
+    const roomIdToClose = peer?.id || mountOpts.roomId;
+    if (roomIdToClose) {
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon(`/api/rooms?action=delete&id=${encodeURIComponent(roomIdToClose)}`);
+      }
+      if (typeof fetch !== "undefined") {
+        void fetch(`/api/rooms?id=${encodeURIComponent(roomIdToClose)}`, {
+          method: "DELETE",
+          keepalive: true,
+        }).catch(() => undefined);
+      }
+      try {
+        const raw = localStorage.getItem("ping:active_rooms");
+        if (raw) {
+          const list = JSON.parse(raw) as { id: string }[];
+          localStorage.setItem("ping:active_rooms", JSON.stringify(list.filter((r) => r.id !== roomIdToClose)));
+        }
+        if (typeof BroadcastChannel !== "undefined") {
+          const bc = new BroadcastChannel("ping:room_sync_v1");
+          bc.postMessage({ t: "rooms-changed" });
+          bc.close();
+        }
+      } catch {}
+    }
+
     hostLifecycle?.stop();
     hostLifecycle = null;
     clearStartTimeout();
     clearStatsInterval();
     if (currentVideoTrack) {
       currentVideoTrack.removeEventListener("ended", stop);
+      currentVideoTrack.removeEventListener("ended", stopLive);
       currentVideoTrack = null;
     }
     for (const { conn } of pendingViewers.values()) {
@@ -687,9 +738,13 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     }
     isStreamPaused = false;
     isAudioMuted = false;
+    isLiveActive = true;
     hostPausedOverlay.hidden = true;
+    hostStoppedOverlay.hidden = true;
     pauseStreamBtn.textContent = "⏸️ Pausar Tela";
     pauseStreamBtn.classList.remove("active");
+    stopStreamBtn.textContent = "⏹️ Parar Live";
+    stopStreamBtn.classList.remove("active");
     muteAudioBtn.textContent = "🔊 Áudio Ativo";
     muteAudioBtn.classList.remove("active");
     preview.srcObject = null;
@@ -699,9 +754,114 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     startBtn.disabled = false;
   };
 
+  const stopLive = (): void => {
+    if (!isLiveActive) return;
+    isLiveActive = false;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      stream = null;
+    }
+    if (currentVideoTrack) {
+      currentVideoTrack.removeEventListener("ended", stop);
+      currentVideoTrack.removeEventListener("ended", stopLive);
+      currentVideoTrack = null;
+    }
+    preview.srcObject = null;
+    hostStoppedOverlay.hidden = false;
+    stopStreamBtn.textContent = "▶️ Iniciar Live";
+    stopStreamBtn.classList.add("active");
+    for (const entry of viewers.values()) {
+      send(entry.conn, { t: "pause", paused: true });
+    }
+    toast("Live parada! A sala continua aberta no mesmo link para os seus amigos.");
+  };
+
+  const resumeLive = async (): Promise<void> => {
+    const opts = readOptions();
+    if (passwordInput.value) {
+      currentPassword = passwordInput.value;
+    }
+    opts.password = currentPassword;
+    let captured: MediaStream;
+    try {
+      captured = await captureScreen(opts);
+    } catch {
+      toast("Captura de tela cancelada.", "info");
+      return;
+    }
+    stream = captured;
+    const newVideoTrack = captured.getVideoTracks()[0];
+    const newAudioTrack = captured.getAudioTracks()[0];
+    if (!newVideoTrack) {
+      toast("Nenhuma faixa de vídeo encontrada.", "error");
+      return;
+    }
+    currentVideoTrack = newVideoTrack;
+    setContentHint(newVideoTrack, opts.hint);
+    newVideoTrack.addEventListener("ended", stopLive);
+
+    const codecOrder = CODEC_PRESETS[opts.codecPreset] ?? CODEC_PRESETS.vp9;
+    for (const entry of viewers.values()) {
+      if (entry.pc) {
+        for (const sender of entry.pc.getSenders()) {
+          if (sender.track?.kind === "video") {
+            void sender.replaceTrack(newVideoTrack);
+          } else if (sender.track?.kind === "audio" && newAudioTrack) {
+            void sender.replaceTrack(newAudioTrack);
+          }
+        }
+        const { kbps, fps, scaleDown } = getPresetParameters(
+          entry.qualityPreset,
+          entry.adapter.maxKbps,
+          opts.fps,
+          entry.customFps,
+        );
+        applyCodecPreferences(entry.pc, codecOrder);
+        void capVideoSender(entry.pc, kbps, fps, opts.hint, scaleDown);
+      }
+      send(entry.conn, { t: "pause", paused: false });
+    }
+
+    preview.srcObject = captured;
+    void preview.play().catch(() => undefined);
+    hostStoppedOverlay.hidden = true;
+    isLiveActive = true;
+    stopStreamBtn.textContent = "⏹️ Parar Live";
+    stopStreamBtn.classList.remove("active");
+    toast("Live iniciada novamente no mesmo link!");
+  };
+
+  const updateVisibilityUi = (): void => {
+    if (isRoomHidden) {
+      toggleVisibilityBtn.textContent = "🙈 Sala Oculta (Apenas Link)";
+      toggleVisibilityBtn.classList.add("btn-hidden-active");
+      toggleVisibilityBtn.title = "A sala não aparece no lobby de salas. Clique para torná-la visível.";
+    } else {
+      toggleVisibilityBtn.textContent = "👁️ Sala Visível no Lobby";
+      toggleVisibilityBtn.classList.remove("btn-hidden-active");
+      toggleVisibilityBtn.title = "A sala aparece no lobby para todos. Clique para ocultá-la.";
+    }
+  };
+
+  const updatePasswordUi = (): void => {
+    if (currentPassword) {
+      changePasswordBtn.textContent = `🔑 Senha: ${currentPassword}`;
+      changePasswordBtn.title = "Clique para alterar a senha da sala";
+      removePasswordBtn.hidden = false;
+    } else {
+      changePasswordBtn.textContent = "🔑 Colocar Senha";
+      changePasswordBtn.title = "Clique para definir uma senha para a sala";
+      removePasswordBtn.hidden = true;
+    }
+  };
+
   const start = async (): Promise<void> => {
     if (peer || stream) stop();
     const opts = readOptions();
+    if (passwordInput.value) {
+      currentPassword = passwordInput.value;
+    }
+    opts.password = currentPassword;
     activeBitrateKbps = opts.bitrateKbps;
     const codecOrder = CODEC_PRESETS[opts.codecPreset] ?? CODEC_PRESETS.vp9;
 
@@ -742,12 +902,12 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     }
     currentVideoTrack = videoTrack;
     setContentHint(videoTrack, opts.hint);
-    videoTrack.addEventListener("ended", stop);
+    videoTrack.addEventListener("ended", stopLive);
 
     const id = mountOpts.roomId || ROOM_PREFIX + shortId(12);
-    const expectedPwHash =
-      opts.password.length > 0
-        ? await hashPassword(id, opts.password)
+    expectedPwHash =
+      currentPassword.length > 0
+        ? await hashPassword(id, currentPassword)
         : null;
 
     const p = new Peer(id, peerOptions());
@@ -770,6 +930,12 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       void preview.play().catch(() => undefined);
       setup.hidden = true;
       live.hidden = false;
+      updateVisibilityUi();
+      updatePasswordUi();
+      isLiveActive = true;
+      hostStoppedOverlay.hidden = true;
+      stopStreamBtn.textContent = "⏹️ Parar Live";
+      stopStreamBtn.classList.remove("active");
       const token = mountOpts.hostToken || sessionStorage.getItem("ping:host_token:" + openedId) || "";
       if (token) {
         hostLifecycle = startHostLifecycle({ roomId: openedId, hostToken: token });
@@ -1339,6 +1505,131 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       ok ? "info" : "error",
     );
   });
+
+  stopStreamBtn.addEventListener("click", () => {
+    if (isLiveActive) {
+      stopLive();
+    } else {
+      void resumeLive();
+    }
+  });
+
+  resumeLiveBtn.addEventListener("click", () => {
+    void resumeLive();
+  });
+
+  toggleVisibilityBtn.addEventListener("click", () => {
+    isRoomHidden = !isRoomHidden;
+    updateVisibilityUi();
+    const roomId = peer?.id || mountOpts.roomId;
+    if (roomId && typeof fetch !== "undefined") {
+      void fetch("/api/rooms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: roomId, hidden: isRoomHidden }),
+      }).catch(() => undefined);
+    }
+    try {
+      const raw = localStorage.getItem("ping:active_rooms");
+      if (raw && roomId) {
+        const list = JSON.parse(raw) as (Room & { hidden?: boolean })[];
+        const target = list.find((r) => r.id === roomId);
+        if (target) {
+          target.hidden = isRoomHidden;
+          localStorage.setItem("ping:active_rooms", JSON.stringify(list));
+        }
+      }
+    } catch {}
+    toast(
+      isRoomHidden
+        ? "A sala agora está oculta do lobby. Somente amigos com o link podem assistir!"
+        : "A sala agora está visível no lobby para todos.",
+    );
+  });
+
+  const removePassword = async () => {
+    currentPassword = "";
+    passwordInput.value = "";
+    expectedPwHash = null;
+    const roomId = peer?.id || mountOpts.roomId;
+    if (roomId) {
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.removeItem(`ping:room_pw:${roomId}`);
+      }
+      if (typeof fetch !== "undefined") {
+        void fetch("/api/rooms", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: roomId, password: null, isPrivate: false }),
+        }).catch(() => undefined);
+      }
+      try {
+        const raw = localStorage.getItem("ping:active_rooms");
+        if (raw) {
+          const list = JSON.parse(raw) as (Room & { isPrivate?: boolean })[];
+          const target = list.find((r) => r.id === roomId);
+          if (target) {
+            target.isPrivate = false;
+            localStorage.setItem("ping:active_rooms", JSON.stringify(list));
+          }
+        }
+      } catch {}
+    }
+    updatePasswordUi();
+    toast("Senha removida! A sala agora é aberta para todos.");
+  };
+
+  changePasswordBtn.addEventListener("click", async () => {
+    const newPw = window.prompt("Digite a nova senha para a sala (ou deixe em branco para remover):", currentPassword);
+    if (newPw === null) return;
+    const trimmed = newPw.trim();
+    if (!trimmed) {
+      await removePassword();
+      return;
+    }
+    currentPassword = trimmed;
+    passwordInput.value = trimmed;
+    const roomId = peer?.id || mountOpts.roomId;
+    if (roomId) {
+      expectedPwHash = await hashPassword(roomId, trimmed);
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(`ping:room_pw:${roomId}`, trimmed);
+      }
+      if (typeof fetch !== "undefined") {
+        void fetch("/api/rooms", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: roomId, password: trimmed, isPrivate: true }),
+        }).catch(() => undefined);
+      }
+      try {
+        const raw = localStorage.getItem("ping:active_rooms");
+        if (raw) {
+          const list = JSON.parse(raw) as (Room & { isPrivate?: boolean })[];
+          const target = list.find((r) => r.id === roomId);
+          if (target) {
+            target.isPrivate = true;
+            localStorage.setItem("ping:active_rooms", JSON.stringify(list));
+          }
+        }
+      } catch {}
+    }
+    updatePasswordUi();
+    toast(`Senha da sala alterada para: ${trimmed}`);
+  });
+
+  removePasswordBtn.addEventListener("click", removePassword);
+
+  if (hostBackLink && mountOpts.onExit) {
+    hostBackLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!live.hidden && !window.confirm("Encerrar a transmissão atual e voltar às salas?")) {
+        return;
+      }
+      stop();
+      mountOpts.onExit?.();
+    });
+  }
 
   window.addEventListener("beforeunload", stop);
 }

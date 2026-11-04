@@ -170,6 +170,77 @@ test.describe("Polimento Frontend & Pontas Soltas", () => {
     await expect(pausedOverlay).toBeHidden();
   });
 
+  test("host possui botão de pausar e parar live, mantendo o mesmo link permanente da sala", async ({ page }) => {
+    await page.goto("/?host=1&admin=ping-master-2026");
+    await page.locator("#start").click();
+    await expect(page.locator("#live")).toBeVisible({ timeout: 15_000 });
+
+    const linkInput = page.locator("#link");
+    const initialLink = await linkInput.inputValue();
+    expect(initialLink).toContain("?room=");
+
+    const stopStreamBtn = page.locator("#stop-stream");
+    const stoppedOverlay = page.locator("#host-stopped-overlay");
+    const resumeBtn = page.locator("#btn-resume-live");
+
+    await expect(stopStreamBtn).toBeVisible();
+    await expect(stopStreamBtn).toHaveText("⏹️ Parar Live");
+
+    // 1. Clica em Parar Live: o stream para, mas a sala e o link continuam os mesmos
+    await stopStreamBtn.click();
+    await expect(stopStreamBtn).toHaveText("▶️ Iniciar Live");
+    await expect(stopStreamBtn).toHaveClass(/active/);
+    await expect(stoppedOverlay).toBeVisible();
+
+    const linkAfterStop = await linkInput.inputValue();
+    expect(linkAfterStop).toBe(initialLink);
+
+    // 2. Retoma a live clicando em Iniciar Transmissão: o link continua o mesmo
+    await resumeBtn.click();
+    await expect(stoppedOverlay).toBeHidden();
+    await expect(stopStreamBtn).toHaveText("⏹️ Parar Live");
+    await expect(stopStreamBtn).not.toHaveClass(/active/);
+
+    const linkAfterResume = await linkInput.inputValue();
+    expect(linkAfterResume).toBe(initialLink);
+  });
+
+  test("host pode alterar senha, tirar senha e alternar visibilidade no lobby em tempo real", async ({ page }) => {
+    await page.goto("/?host=1&admin=ping-master-2026");
+    await page.locator("#start").click();
+    await expect(page.locator("#live")).toBeVisible({ timeout: 15_000 });
+
+    const toggleVisBtn = page.locator("#btn-toggle-visibility");
+    const changePwBtn = page.locator("#btn-change-password");
+    const removePwBtn = page.locator("#btn-remove-password");
+
+    await expect(toggleVisBtn).toBeVisible();
+    await expect(toggleVisBtn).toHaveText("👁️ Sala Visível no Lobby");
+
+    // 1. Alterna visibilidade no lobby para oculta
+    await toggleVisBtn.click();
+    await expect(toggleVisBtn).toHaveText("🙈 Sala Oculta (Apenas Link)");
+    await expect(toggleVisBtn).toHaveClass(/btn-hidden-active/);
+
+    // Alterna de volta para visível
+    await toggleVisBtn.click();
+    await expect(toggleVisBtn).toHaveText("👁️ Sala Visível no Lobby");
+    await expect(toggleVisBtn).not.toHaveClass(/btn-hidden-active/);
+
+    // 2. Define nova senha via prompt
+    page.once("dialog", async (dialog) => {
+      await dialog.accept("segredo123");
+    });
+    await changePwBtn.click();
+    await expect(changePwBtn).toHaveText("🔑 Senha: segredo123");
+    await expect(removePwBtn).toBeVisible();
+
+    // 3. Remove a senha clicando em Tirar Senha
+    await removePwBtn.click();
+    await expect(changePwBtn).toHaveText("🔑 Colocar Senha");
+    await expect(removePwBtn).toBeHidden();
+  });
+
   test("funcionalidades de transmissão do Discord no viewer (Modo Teatro, Badge Ao Vivo, Stats Modal)", async ({ page }) => {
     await page.goto("/?room=ping-testpip123");
     await page.locator("#bar").evaluate((el) => { el.hidden = false; });

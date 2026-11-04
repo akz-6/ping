@@ -1,4 +1,4 @@
-﻿/* Compatibilidade: telas legadas (host e viewer) usam nomes antigos mapeados para os tokens. */
+/* Compatibilidade: telas legadas (host e viewer) usam nomes antigos mapeados para os tokens. */
 .legacy {
   --panel: var(--card);
   --panel-2: var(--bg);
@@ -606,6 +606,76 @@ body {
   background: var(--danger);
   color: #ffffff;
   border-color: var(--danger);
+}
+
+.live-room-settings {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0 14px;
+}
+
+.btn-discord-pill {
+  background: var(--card-hover, rgba(255, 255, 255, 0.05));
+  color: var(--text-2, #94a3b8);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-discord-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-1, #f8fafc);
+  border-color: var(--primary);
+}
+
+.btn-discord-pill.btn-hidden-active {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+
+.stopped-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.9);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  text-align: center;
+  padding: 16px;
+  border-radius: inherit;
+}
+
+.stopped-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.stopped-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.stopped-desc {
+  margin: 0;
+  font-size: 13px;
+}
+
+.resume-live-btn {
+  margin-top: 6px;
 }
 
 .viewer.theater-mode {

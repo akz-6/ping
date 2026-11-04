@@ -363,9 +363,13 @@ export function startHostLifecycle(opts: {
 
     try {
       if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-        navigator.sendBeacon(`/api/rooms?id=${encodeURIComponent(opts.roomId)}`);
-      } else {
-        void fetch(`/api/rooms?id=${encodeURIComponent(opts.roomId)}`, { method: "DELETE" }).catch(() => undefined);
+        navigator.sendBeacon(`/api/rooms?action=delete&id=${encodeURIComponent(opts.roomId)}`);
+      }
+      if (typeof fetch !== "undefined") {
+        void fetch(`/api/rooms?id=${encodeURIComponent(opts.roomId)}`, {
+          method: "DELETE",
+          keepalive: true,
+        }).catch(() => undefined);
       }
     } catch {}
 
@@ -374,6 +378,11 @@ export function startHostLifecycle(opts: {
       if (raw) {
         const list = JSON.parse(raw) as { id: string }[];
         localStorage.setItem("ping:active_rooms", JSON.stringify(list.filter((r) => r.id !== opts.roomId)));
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        const bc = new BroadcastChannel("ping:room_sync_v1");
+        bc.postMessage({ t: "rooms-changed" });
+        bc.close();
       }
     } catch {}
   };
