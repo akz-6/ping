@@ -1,59 +1,64 @@
-﻿import { openDialog } from "./primitives";
+import { openDialog } from "./primitives";
 import { Button, Field } from "./primitives";
 import { h } from "./dom";
 
 const STORAGE_KEY = "ping:creator_authorized";
-export const DEFAULT_CREATOR_KEY = "0604";
 
-export function getCreatorSecret(): string {
-  const envKey = (typeof import.meta !== "undefined" && import.meta.env?.VITE_CREATOR_KEY) as string | undefined;
-  return (envKey && envKey.trim()) || DEFAULT_CREATOR_KEY;
-}
-
-function isKeyValid(candidate: string | null | undefined): boolean {
-  if (!candidate) return false;
+async function verifyCreatorKeyOnServer(candidate: string): Promise<boolean> {
   const clean = candidate.trim();
-  const configured = getCreatorSecret();
-  return clean === configured || clean === "0604" || clean === "ping-master-2026";
+  if (!clean) return false;
+  try {
+    const res = await fetch("/api/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify-creator-key", key: clean }),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { ok?: boolean };
+      return Boolean(data?.ok);
+    }
+  } catch {
+    // falha na rede
+  }
+  return false;
 }
 
-export function checkUrlForCreatorKey(): boolean {
+let checkUrlPromise: Promise<boolean> | null = null;
+
+export function checkUrlForCreatorKey(): Promise<boolean> {
+  if (checkUrlPromise) return checkUrlPromise;
   try {
     const params = new URLSearchParams(location.search);
     const candidate = params.get("admin") || params.get("creator_key") || params.get("key");
 
-    if (candidate && isKeyValid(candidate)) {
-      localStorage.setItem(STORAGE_KEY, "true");
+    if (candidate) {
       params.delete("admin");
       params.delete("creator_key");
       params.delete("key");
       const query = params.toString();
       const cleanUrl = location.pathname + (query ? `?${query}` : "");
       history.replaceState(null, "", cleanUrl);
-      return true;
+
+      checkUrlPromise = authorizeCreator(candidate);
+      return checkUrlPromise;
     }
   } catch {
     // ignora
   }
-  return false;
+  return Promise.resolve(false);
 }
 
 // Executa imediatamente na inicialização
-checkUrlForCreatorKey();
+void checkUrlForCreatorKey();
 
 export function isCreatorAuthorized(): boolean {
   try {
-    // 1. Checa primeiro a URL caso tenha sido alterada dinamicamente
-    if (checkUrlForCreatorKey()) {
-      return true;
-    }
-
-    // 2. Verifica se a máquina já foi autorizada no localStorage deste navegador
+    // 1. Verifica se a máquina já foi autorizada no localStorage deste navegador
     if (localStorage.getItem(STORAGE_KEY) === "true") {
       return true;
     }
 
-    // 3. Em localhost (testes automatizados e desenvolvimento local), a máquina é sempre autorizada.
+    // 2. Em localhost (testes automatizados e desenvolvimento local), a máquina é autorizada
     const host = location.hostname;
     const forceNonLocal = (window as unknown as { __forceNonLocalhost?: boolean }).__forceNonLocalhost;
     if (!forceNonLocal && (host === "localhost" || host === "127.0.0.1" || host === "::1")) {
@@ -65,8 +70,10 @@ export function isCreatorAuthorized(): boolean {
   return false;
 }
 
-export function authorizeCreator(candidate: string): boolean {
-  if (candidate && isKeyValid(candidate)) {
+export async function authorizeCreator(candidate: string): Promise<boolean> {
+  if (!candidate) return false;
+  const ok = await verifyCreatorKeyOnServer(candidate);
+  if (ok) {
     try {
       localStorage.setItem(STORAGE_KEY, "true");
     } catch {}
@@ -99,7 +106,7 @@ export function openTestingNoticeModal(opts: {
 
   const unlockInput = Field({
     label: "Chave de acesso",
-    placeholder: "Digite a chave do anfitrião (0604)",
+    placeholder: "Digite a chave do anfitrião",
   });
   unlockInput.input.type = "password";
 
@@ -130,9 +137,12 @@ export function openTestingNoticeModal(opts: {
 
   dismissBtn.addEventListener("click", () => dlg.close());
 
-  confirmUnlockBtn.addEventListener("click", () => {
+  confirmUnlockBtn.addEventListener("click", async () => {
     const val = unlockInput.input.value;
-    if (authorizeCreator(val)) {
+    confirmUnlockBtn.disabled = true;
+    const ok = await authorizeCreator(val);
+    confirmUnlockBtn.disabled = false;
+    if (ok) {
       dlg.close();
       opts.onAuthorized();
     } else {

@@ -410,8 +410,7 @@ export class MockRoomService implements RoomService {
       (savedPw !== null && password === savedPw) ||
       password === "demo" ||
       password === "ping2026" ||
-      password === "teste2026" ||
-      password === "0604";
+      password === "teste2026";
 
     // Verifica com o backend na nuvem se não reconheceu localmente
     if (!isCorrect && typeof fetch !== "undefined") {

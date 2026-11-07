@@ -22,5 +22,8 @@ export default defineConfig({
     url: "http://localhost:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 20_000,
+    env: {
+      OWNER_KEY: process.env.OWNER_KEY || "ping-test-owner-key",
+    },
   },
 });

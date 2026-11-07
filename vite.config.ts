@@ -49,6 +49,14 @@ function localApiRoomsPlugin(): Plugin {
 
           const action = body.action || url.searchParams.get("action");
           const actionId = body.id || url.searchParams.get("id");
+          const ownerKey = (process.env.OWNER_KEY || "ping-test-owner-key").trim();
+
+          if (action === "verify-creator-key") {
+            const candidateKey = String(body.key || body.passwordAttempt || body.password || url.searchParams.get("key") || "").trim();
+            const matches = Boolean(candidateKey && candidateKey === ownerKey);
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: matches }));
+          }
 
           if (action === "delete" && actionId) {
             inMemoryRooms = inMemoryRooms.filter((r) => r.id !== actionId);
@@ -59,7 +67,7 @@ function localApiRoomsPlugin(): Plugin {
           if (action === "verify" && actionId) {
             const target = inMemoryRooms.find((r) => r.id === actionId);
             const passAttempt = body.passwordAttempt || body.password || url.searchParams.get("password");
-            const matches = !target?.password || target.password === passAttempt || passAttempt === "0604";
+            const matches = !target?.password || target.password === passAttempt || passAttempt === ownerKey;
             res.statusCode = 200;
             return res.end(JSON.stringify({ ok: matches }));
           }

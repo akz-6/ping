@@ -15,7 +15,7 @@ import {
 import { h, normalize } from "./dom";
 import { getHandle, getProfile } from "./identity";
 import { openCreateRoomModal, openPasswordModal, openProfileModal } from "./modals";
-import { isCreatorAuthorized, openTestingNoticeModal } from "./auth-gate";
+import { isCreatorAuthorized, openTestingNoticeModal, checkUrlForCreatorKey } from "./auth-gate";
 import { MAX_OPEN_ROOMS, createRoomService, type Room } from "./services/rooms";
 import { getConsentStatus, openConsentBanner } from "./services/ads";
 
@@ -93,7 +93,8 @@ export function mountApp(root: HTMLElement): void {
     adsRight.hidden = true;
   };
 
-  const onCreate = (): void => {
+  const onCreate = async (): Promise<void> => {
+    await checkUrlForCreatorKey();
     const isOwner = isCreatorAuthorized();
     const currentOpen = openCount();
 
@@ -288,15 +289,17 @@ export function mountApp(root: HTMLElement): void {
   }
 
   if (new URLSearchParams(location.search).get("host") === "1") {
-    if (isCreatorAuthorized()) {
-      showHost("");
-    } else {
-      openTestingNoticeModal({
-        onAuthorized: () => {
-          toast("Máquina autorizada com sucesso!");
-          showHost("");
-        },
-      });
-    }
+    void checkUrlForCreatorKey().then(() => {
+      if (isCreatorAuthorized()) {
+        showHost("");
+      } else {
+        openTestingNoticeModal({
+          onAuthorized: () => {
+            toast("Máquina autorizada com sucesso!");
+            showHost("");
+          },
+        });
+      }
+    });
   }
 }

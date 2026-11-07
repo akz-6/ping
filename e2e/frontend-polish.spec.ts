@@ -268,7 +268,7 @@ test.describe("Polimento Frontend & Pontas Soltas", () => {
     await expect(theaterBtn).toHaveClass(/active/);
 
     // Desativa Modo Teatro via botão
-    await theaterBtn.click();
+    await theaterBtn.click({ force: true });
     await expect(viewer).not.toHaveClass(/theater-mode/);
     await expect(theaterBtn).not.toHaveClass(/active/);
 

@@ -1,10 +1,16 @@
-﻿import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
+
+const TEST_OWNER_KEY = process.env.OWNER_KEY || "ping-test-owner-key";
 
 test.describe("Trava de Criação de Sala - Máquina Autorizada", () => {
-  test("desbloqueio automático via parâmetro ?admin=ping-master-2026 na URL", async ({ page }) => {
-    await page.goto("/?admin=ping-master-2026");
-    const isAuthed = await page.evaluate(() => localStorage.getItem("ping:creator_authorized"));
-    expect(isAuthed).toBe("true");
+  test("desbloqueio automático via parâmetro ?admin na URL", async ({ page }) => {
+    await page.goto(`/?admin=${encodeURIComponent(TEST_OWNER_KEY)}`);
+
+    await expect
+      .poll(async () => page.evaluate(() => localStorage.getItem("ping:creator_authorized")), {
+        timeout: 5000,
+      })
+      .toBe("true");
 
     // Parâmetro é limpo da barra de endereços
     expect(page.url()).not.toContain("admin=");
@@ -39,8 +45,8 @@ test.describe("Trava de Criação de Sala - Máquina Autorizada", () => {
     await noticeDlg.getByRole("button", { name: "Desbloquear máquina" }).click();
     await expect(noticeDlg).toContainText("Chave incorreta");
 
-    // Chave correta -> desbloqueia e abre Criar Sala
-    await passInput.fill("0604");
+    // Chave correta via validação segura no servidor -> desbloqueia e abre Criar Sala
+    await passInput.fill(TEST_OWNER_KEY);
     await noticeDlg.getByRole("button", { name: "Desbloquear máquina" }).click();
 
     await expect(noticeDlg).toHaveCount(0);
@@ -50,11 +56,16 @@ test.describe("Trava de Criação de Sala - Máquina Autorizada", () => {
     expect(isAuthed).toBe("true");
   });
 
-  test("desbloqueio direto via parâmetro ?admin=0604 na URL", async ({ page }) => {
-    await page.goto("/?admin=0604");
-    const isAuthed = await page.evaluate(() => localStorage.getItem("ping:creator_authorized"));
-    expect(isAuthed).toBe("true");
-    expect(page.url()).not.toContain("admin=");
+  test("desbloqueio direto via parâmetro ?key na URL", async ({ page }) => {
+    await page.goto(`/?key=${encodeURIComponent(TEST_OWNER_KEY)}`);
+
+    await expect
+      .poll(async () => page.evaluate(() => localStorage.getItem("ping:creator_authorized")), {
+        timeout: 5000,
+      })
+      .toBe("true");
+
+    expect(page.url()).not.toContain("key=");
 
     await page.locator("#sidebar-create").click();
     await expect(page.getByRole("dialog", { name: "Criar Sala" })).toBeVisible();

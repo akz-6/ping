@@ -17,6 +17,7 @@ export interface StoredRoom {
 const BLOB_FILENAME = "rooms-catalog.json";
 const MAX_STALE_MS = 60_000; // 60 segundos sem heartbeat considera inativa
 const MAX_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 horas máximo de vida útil da sala
+const OWNER_KEY = (process.env.OWNER_KEY || "0604").trim();
 
 let memoryRooms: StoredRoom[] | null = null;
 let lastMemoryUpdate = 0;
@@ -110,6 +111,13 @@ export default async function handler(req: any, res: any) {
       const action = body.action || req.query?.action || urlParams?.get("action");
       const actionId = body.id || req.query?.id || urlParams?.get("id");
 
+      // Validação segura da chave do desenvolvedor / anfitrião no servidor
+      if (action === "verify-creator-key") {
+        const candidateKey = String((body as any).key ?? body.passwordAttempt ?? body.password ?? req.query?.key ?? urlParams?.get("key") ?? "").trim();
+        const matches = Boolean(candidateKey && candidateKey === OWNER_KEY);
+        return res.status(200).json({ ok: matches });
+      }
+
       // Suporte a exclusão rápida via sendBeacon (POST com action=delete)
       if (action === "delete" && actionId) {
         const rooms = await getStoredRooms();
@@ -124,7 +132,7 @@ export default async function handler(req: any, res: any) {
         const target = rooms.find((r) => r.id === actionId);
         if (!target) return res.status(404).json({ ok: false, error: "Sala não encontrada" });
         const passAttempt = body.passwordAttempt ?? body.password ?? req.query?.password ?? urlParams?.get("password");
-        const matches = !target.password || target.password === passAttempt || passAttempt === "0604";
+        const matches = !target.password || target.password === passAttempt || passAttempt === OWNER_KEY;
         return res.status(200).json({ ok: matches });
       }
 
@@ -135,8 +143,10 @@ export default async function handler(req: any, res: any) {
       const rooms = await getStoredRooms();
       const openCount = rooms.filter((r) => !r.isPrivate && !r.hidden).length;
 
+      const isOwner = body.isOwner || ((body as any).creatorKey && (body as any).creatorKey === OWNER_KEY);
+
       // Limite de 2 salas abertas no catálogo global (exceto se criado pelo dono com master key)
-      if (!body.isPrivate && !body.hidden && !body.isOwner && openCount >= 2) {
+      if (!body.isPrivate && !body.hidden && !isOwner && openCount >= 2) {
         return res.status(403).json({ error: "LIMITE_SALAS_ABERTAS" });
       }
 
