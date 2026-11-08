@@ -1269,6 +1269,10 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           return;
         }
 
+        if (msg.t === "chat-send" || msg.t === "transport-fallback") {
+          return;
+        }
+
         if (welcomed) return;
 
         // 1. Verifica bloqueio

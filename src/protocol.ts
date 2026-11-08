@@ -1,4 +1,7 @@
-﻿// Mensagens trocadas no canal de dados (DataConnection) entre host e viewer.
+// Mensagens trocadas no canal de dados (DataConnection) entre host e viewer.
+import type { ChatMsg } from "./chat/types";
+import type { TransportInfo, TransportMode } from "./transport/types";
+export type { TransportInfo, TransportMode };
 
 export type QualityPreset = "source" | "720p" | "480p" | "360p";
 
@@ -6,6 +9,7 @@ export type ToHost =
   | {
       t: "hello";
       pwHash?: string;
+      ticket?: string;
     }
   | {
       t: "quality-preset";
@@ -14,6 +18,14 @@ export type ToHost =
   | {
       t: "fps-cap";
       fps: number;
+    }
+  | {
+      t: "chat-send";
+      text: string;
+    }
+  | {
+      t: "transport-fallback";
+      reason: string;
     };
 
 export type DeniedReason =
@@ -22,16 +34,22 @@ export type DeniedReason =
   | "full"
   | "wrong-password";
 
+export type ChatRejectedReason = "rate" | "muted" | "invalid";
+
 export type ToViewer =
   | { t: "auth-required"; error?: boolean; remaining?: number }
   | { t: "pending" }
-  | { t: "approved" }
+  | { t: "approved"; transport?: TransportInfo }
   | { t: "denied"; reason?: DeniedReason }
   | { t: "welcome"; maxFps?: number }
   | { t: "viewers"; n: number }
   | { t: "kicked" }
   | { t: "ended" }
-  | { t: "pause"; paused: boolean };
+  | { t: "pause"; paused: boolean }
+  | { t: "chat-history"; msgs: ChatMsg[] }
+  | { t: "chat-msg"; msg: ChatMsg }
+  | { t: "chat-rejected"; reason: ChatRejectedReason }
+  | { t: "transport-switch"; mode: "p2p" };
 
 const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
 const CLIENT_ID_RE = /^[a-z0-9]{4,32}$/;
@@ -41,6 +59,16 @@ const DENIED_REASONS = new Set<DeniedReason>([
   "full",
   "wrong-password",
 ]);
+const CHAT_REJECTED_REASONS = new Set<ChatRejectedReason>([
+  "rate",
+  "muted",
+  "invalid",
+]);
+
+export const DISCORD_AVATAR_RE =
+  /^https:\/\/cdn\.discordapp\.com\/(avatars\/\d+\/[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9]+)?(?:\?[a-zA-Z0-9_=&]+)?|embed\/avatars\/\d+\.png)$/;
+
+export const CONTROL_CHARS_RE = /[\x00-\x1F\x7F]/;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -48,18 +76,68 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 const VALID_PRESETS = new Set<QualityPreset>(["source", "720p", "480p", "360p"]);
 
+export function isValidChatMsg(msg: unknown): msg is ChatMsg {
+  if (!isPlainObject(msg)) return false;
+  if (typeof msg.id !== "string" || !msg.id || msg.id.length > 64) return false;
+  if (typeof msg.ts !== "number" || !Number.isFinite(msg.ts) || msg.ts <= 0) return false;
+  if (msg.kind !== "user" && msg.kind !== "system") return false;
+  if (msg.kind === "system" && msg.authorId !== null) return false;
+  if (msg.authorId !== null && (typeof msg.authorId !== "string" || !msg.authorId || msg.authorId.length > 64)) {
+    return false;
+  }
+  if (typeof msg.name !== "string" || !msg.name.trim() || msg.name.trim().length > 32) return false;
+  if (msg.badge !== null && msg.badge !== "host" && msg.badge !== "discord") return false;
+  if (msg.avatar !== null) {
+    if (typeof msg.avatar !== "string" || !DISCORD_AVATAR_RE.test(msg.avatar)) {
+      return false;
+    }
+  }
+  if (
+    typeof msg.text !== "string" ||
+    msg.text.length < 1 ||
+    msg.text.length > 300 ||
+    CONTROL_CHARS_RE.test(msg.text)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function isValidTransportInfo(t: unknown): t is TransportInfo {
+  if (!isPlainObject(t)) return false;
+  if (t.mode !== "sfu" && t.mode !== "p2p") return false;
+  if (t.mode === "sfu") {
+    if (!isPlainObject(t.sfu)) return false;
+    if (typeof t.sfu.hostSessionId !== "string" || !t.sfu.hostSessionId) return false;
+    if (!Array.isArray(t.sfu.tracks)) return false;
+    for (const track of t.sfu.tracks) {
+      if (!isPlainObject(track)) return false;
+      if (track.kind !== "video" && track.kind !== "audio") return false;
+      if (typeof track.trackName !== "string" || !track.trackName) return false;
+    }
+  }
+  return true;
+}
+
 /** Valida estritamente mensagens vindas do viewer para o host. */
 export function parseToHost(data: unknown): ToHost | null {
   if (!isPlainObject(data)) return null;
 
   if (data.t === "hello") {
+    const out: ToHost = { t: "hello" };
     if (data.pwHash !== undefined) {
       if (typeof data.pwHash !== "string" || !SHA256_HEX_RE.test(data.pwHash)) {
         return null;
       }
-      return { t: "hello", pwHash: data.pwHash };
+      out.pwHash = data.pwHash;
     }
-    return { t: "hello" };
+    if (data.ticket !== undefined) {
+      if (typeof data.ticket !== "string" || !data.ticket || data.ticket.length > 1024) {
+        return null;
+      }
+      out.ticket = data.ticket;
+    }
+    return out;
   }
 
   if (data.t === "quality-preset") {
@@ -80,6 +158,29 @@ export function parseToHost(data: unknown): ToHost | null {
       data.fps <= 360
     ) {
       return { t: "fps-cap", fps: Math.round(data.fps) };
+    }
+    return null;
+  }
+
+  if (data.t === "chat-send") {
+    if (
+      typeof data.text === "string" &&
+      data.text.length >= 1 &&
+      data.text.length <= 300 &&
+      !CONTROL_CHARS_RE.test(data.text)
+    ) {
+      return { t: "chat-send", text: data.text };
+    }
+    return null;
+  }
+
+  if (data.t === "transport-fallback") {
+    if (
+      typeof data.reason === "string" &&
+      data.reason.length >= 1 &&
+      data.reason.length <= 120
+    ) {
+      return { t: "transport-fallback", reason: data.reason };
     }
     return null;
   }
@@ -106,10 +207,18 @@ export function parseToViewer(data: unknown): ToViewer | null {
     }
 
     case "pending":
-    case "approved":
     case "kicked":
     case "ended":
       return { t: data.t };
+
+    case "approved": {
+      const out: ToViewer = { t: "approved" };
+      if (data.transport !== undefined) {
+        if (!isValidTransportInfo(data.transport)) return null;
+        out.transport = data.transport;
+      }
+      return out;
+    }
 
     case "viewers": {
       if (
@@ -159,6 +268,34 @@ export function parseToViewer(data: unknown): ToViewer | null {
     case "pause": {
       if (typeof data.paused !== "boolean") return null;
       return { t: "pause", paused: data.paused };
+    }
+
+    case "chat-history": {
+      if (!Array.isArray(data.msgs) || data.msgs.length > 50) return null;
+      for (const m of data.msgs) {
+        if (!isValidChatMsg(m)) return null;
+      }
+      return { t: "chat-history", msgs: data.msgs as ChatMsg[] };
+    }
+
+    case "chat-msg": {
+      if (!isValidChatMsg(data.msg)) return null;
+      return { t: "chat-msg", msg: data.msg as ChatMsg };
+    }
+
+    case "chat-rejected": {
+      if (
+        typeof data.reason !== "string" ||
+        !CHAT_REJECTED_REASONS.has(data.reason as ChatRejectedReason)
+      ) {
+        return null;
+      }
+      return { t: "chat-rejected", reason: data.reason as ChatRejectedReason };
+    }
+
+    case "transport-switch": {
+      if (data.mode !== "p2p") return null;
+      return { t: "transport-switch", mode: "p2p" };
     }
 
     default:
