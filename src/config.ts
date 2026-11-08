@@ -1,4 +1,4 @@
-﻿import { Peer } from "peerjs";
+import { Peer } from "peerjs";
 
 type PeerOptions = NonNullable<ConstructorParameters<typeof Peer>[1]>;
 
@@ -6,9 +6,12 @@ export const ROOM_PREFIX = "ping-";
 export const ROOM_PATTERN = /^(ping-|demo-)[a-z0-9_-]{4,30}$/;
 export const CONNECT_TIMEOUT_MS = 15_000;
 
-const env = import.meta.env;
+const env: Record<string, any> =
+  typeof import.meta !== "undefined" && import.meta.env
+    ? import.meta.env
+    : (globalThis as { process?: { env?: Record<string, any> } }).process?.env ?? {};
 
-function iceServers(): RTCIceServer[] {
+export function fallbackIceServers(): RTCIceServer[] {
   const servers: RTCIceServer[] = [
     {
       urls: [
@@ -34,10 +37,35 @@ function iceServers(): RTCIceServer[] {
   return servers;
 }
 
-export function peerOptions(): PeerOptions {
+let cachedIceServers: RTCIceServer[] | null = null;
+let lastIceFetch = 0;
+
+export async function fetchIceServers(): Promise<RTCIceServer[]> {
+  const now = Date.now();
+  if (cachedIceServers && now - lastIceFetch < 300_000) {
+    return cachedIceServers;
+  }
+  try {
+    const res = await fetch("/api/turn", {
+      signal: AbortSignal.timeout(2000),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.iceServers) && data.iceServers.length > 0) {
+        cachedIceServers = data.iceServers;
+        lastIceFetch = now;
+        return data.iceServers;
+      }
+    }
+  } catch {}
+  return fallbackIceServers();
+}
+
+export function peerOptions(customIceServers?: RTCIceServer[]): PeerOptions {
   const opts: PeerOptions = {
     debug: env.DEV ? 2 : 0,
-    config: { iceServers: iceServers() },
+    config: { iceServers: customIceServers || cachedIceServers || fallbackIceServers() },
   };
 
   const host = String(env.VITE_PEER_HOST ?? "").trim();
@@ -51,4 +79,8 @@ export function peerOptions(): PeerOptions {
 }
 
 export const hasTurn = (): boolean =>
-  String(env.VITE_TURN_URLS ?? "").trim().length > 0;
+  Boolean(
+    cachedIceServers?.some((s) =>
+      typeof s.urls === "string" ? s.urls.startsWith("turn:") : s.urls.some((u) => u.startsWith("turn:")),
+    ) || String(env.VITE_TURN_URLS ?? "").trim().length > 0,
+  );

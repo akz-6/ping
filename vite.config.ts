@@ -15,6 +15,34 @@ function localApiRoomsPlugin(): Plugin {
     name: "local-api-rooms",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
+        if (req.url?.startsWith("/api/turn")) {
+          res.setHeader("Content-Type", "application/json");
+          res.statusCode = 200;
+          return res.end(
+            JSON.stringify({
+              iceServers: [
+                {
+                  urls: [
+                    "stun:stun.l.google.com:19302",
+                    "stun:stun1.l.google.com:19302",
+                    "stun:stun.relay.metered.ca:80",
+                  ],
+                },
+                {
+                  urls: [
+                    "turn:openrelay.metered.ca:80",
+                    "turn:openrelay.metered.ca:443",
+                  ],
+                  username: "openrelayproject",
+                  credential: "openrelayproject",
+                },
+              ],
+              ttl: 300,
+              degraded: true,
+            }),
+          );
+        }
+
         if (!req.url?.startsWith("/api/rooms")) return next();
         const url = new URL(req.url, "http://localhost");
         const method = (req.method || "GET").toUpperCase();

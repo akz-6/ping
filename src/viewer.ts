@@ -3,6 +3,7 @@ import {
   CONNECT_TIMEOUT_MS,
   hasTurn,
   peerOptions,
+  fetchIceServers,
   ROOM_PATTERN,
 } from "./config";
 import {
@@ -513,7 +514,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
     }, delay);
   };
 
-  const connectAttempt = (): void => {
+  const connectAttempt = async (): Promise<void> => {
     if (finished) return;
     cleanupCurrentAttempt();
     gotStream = false;
@@ -526,7 +527,10 @@ export function mountViewer(root: HTMLElement, room: string): void {
       );
     }
 
-    const p = new Peer(peerOptions());
+    const iceServers = await fetchIceServers();
+    if (finished) return;
+
+    const p = new Peer(peerOptions(iceServers));
     peer = p;
 
     attemptTimeout = window.setTimeout(() => {

@@ -1,5 +1,5 @@
 import { Peer, type DataConnection, type MediaConnection } from "peerjs";
-import { CONNECT_TIMEOUT_MS, hasTurn, peerOptions, ROOM_PREFIX } from "./config";
+import { CONNECT_TIMEOUT_MS, hasTurn, peerOptions, ROOM_PREFIX, fetchIceServers } from "./config";
 import {
   applyCodecPreferences,
   BitrateAdapter,
@@ -913,7 +913,8 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         ? await hashPassword(id, currentPassword)
         : null;
 
-    const p = new Peer(id, peerOptions());
+    const iceServers = await fetchIceServers();
+    const p = new Peer(id, peerOptions(iceServers));
     peer = p;
 
     startTimeout = window.setTimeout(() => {
