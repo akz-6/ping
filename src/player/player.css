@@ -39,6 +39,12 @@
   pointer-events: none;
 }
 
+.video-js .vjs-control-bar .viewer-helpers,
+.video-js .vjs-control-bar .viewer-helpers * {
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
 /* Botões da Barra */
 .video-js .vjs-button {
   cursor: pointer;

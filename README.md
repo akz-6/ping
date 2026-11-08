@@ -1,203 +1,151 @@
-# Ping
+# Ping v2
 
-Compartilhamento de tela P2P no navegador, ideal para transmitir jogos, vídeos ou apresentações em **1080p60 / 1440p / 4K** enquanto conversa em chamadas de voz (como no Discord). O frontend estático fica na Vercel e o fluxo de vídeo viaja **diretamente do seu computador para o navegador de quem assiste** via WebRTC — o vídeo nunca passa pela Vercel.
-
-Veja [`ARCHITECTURE.md`](./ARCHITECTURE.md) para os detalhes técnicos de protocolo, controle de acesso, adaptação de bitrate e segurança.
+Plataforma moderna de transmissão ao vivo e compartilhamento de tela WebRTC em ultra-baixa latência (< 100 ms), projetada para transmitir jogos, vídeos e apresentações em até **4K a 60 FPS**, com **Chat em tempo real**, **Design System Black + Gray**, player customizado baseado no **Video.js 8.x**, arquitetura de transporte híbrida **Cloudflare Calls (WebRTC SFU Anycast) + Fallback P2P Mesh com TURN**, autenticação **Discord OAuth2 v10** e conformidade total com as políticas do **Google AdSense e LGPD**.
 
 ---
 
-## Como usar
+## ⚡ Novidades do Ping v2
 
-```text
-[Anfitrião] Abre o Ping -> Escolhe 1080p / 60 FPS -> Clica em "Iniciar transmissão"
-     │
-     ├──> Link copiado: https://seu-ping.vercel.app/?room=ping-x7k2m9p4q8w3
-     │
-[Espectador] Abre o link no navegador (PC ou celular) -> Assiste em tempo real (100–300 ms)
-```
-
-### Para quem transmite (Anfitrião)
-1. Acesse a página inicial do Ping no Chrome, Edge ou Firefox (computador).
-2. Escolha a **Taxa de quadros** (`30` ou `60 FPS`), **Resolução** (`720p` a `4K`), **Bitrate máximo por espectador** (`4` a `20 Mbps`) e **Tipo de conteúdo** (*Jogo / vídeo* para priorizar fluidez ou *Texto / slides* para priorizar nitidez).
-3. *(Opcional)* Abra **Opções avançadas de vídeo, rede e acesso** para:
-   - Ajustar a **Preferência de codec** (`VP9`, `AV1`, `H.264` ou `VP8`).
-   - Informar **Meu upload em Mbps** para receber alertas caso o número de espectadores ultrapasse sua banda.
-   - Definir **Máximo de espectadores**, **Senha da sala** (verificada via hash SHA-256) e **Exigir aprovação manual** para cada espectador.
-4. Clique em **Iniciar transmissão**, selecione a tela, janela ou aba (marque *Compartilhar áudio do sistema* na janela do navegador se desejar som) e envie o link copiado para os amigos.
-5. Durante a transmissão, acompanhe a tabela em tempo real com **Codec, Bitrate, FPS, RTT e Limitação** por espectador, podendo **Remover** ou **Bloquear** qualquer participante a qualquer momento.
-
-### Para quem assiste (Espectador)
-1. Abra o link `?room=ping-...` em qualquer navegador moderno (desktop ou celular), sem instalar nada.
-2. Se a sala tiver senha ou aprovação manual, digite a senha ou aguarde o anfitrião aceitar.
-3. O vídeo inicia automaticamente (começa mudo por exigência de autoplay dos navegadores — clique em **Ativar som** ou pressione `M`).
-4. **Atalhos e controles do reprodutor:**
-   - `M`: ativar som / silenciar.
-   - `F` ou **duplo clique no vídeo**: alternar tela cheia.
-   - A barra inferior e o cursor do mouse se ocultam automaticamente após **3 segundos** sem movimento.
-   - O indicador de qualidade (**Boa**, **Média**, **Ruim**) resume em tempo real a saúde da recepção com base em latência (RTT), perda de pacotes e taxa de quadros.
+1. **Transporte Híbrido Resiliente**:
+   - **Cloudflare Calls SFU**: Distribuição global Anycast na porta 443 HTTPS com cota gratuita de 1 TB (1.000 GB) de tráfego mensal, furando qualquer CGNAT ou firewall restritivo sem sobrecarregar o upload do anfitrião.
+   - **Fallback Automático P2P / TURN**: Se a API da Cloudflare falhar ou a cota esgotar, o anfitrião e os espectadores caem instantaneamente para conexão direta P2P com servidores de relay Metered TURN / OpenRelay.
+   - **Failover granular por espectador**: Se um espectador específico tiver problemas de rota para o SFU, ele solicita `transport-fallback` e recebe o stream diretamente via P2P.
+2. **Player Customizado (Video.js 8.x)**:
+   - Interface Black + Gray inspirada no player de referência, totalmente integrada com aceleração por hardware e `HTMLVideoElement.srcObject`.
+   - Menus nativos de **Resolução**, **Taxa de quadros (FPS)**, **Modo Teatro**, **Picture-in-Picture (PiP)**, **Tela Cheia** e **Estatísticas de Conexão** detalhadas.
+   - Suporte a container queries e dimensionamento responsivo com zero inline styles (CSP estrita).
+3. **Palco & Chat em Tempo Real**:
+   - Chat ao vivo integrado ao palco de transmissão, renderizado com layout colapsável no desktop e gaveta inferior no mobile.
+   - **Autoridade total do host**: Mensagens validadas, carimbadas com timestamp e distribuídas pelo anfitrião via canal de controle PeerJS.
+   - **Proteção anti-spam**: Token bucket (1 msg/1,2s, burst de 3), silenciamento de 30s após infrações repetidas e sanitização estrita via `textContent` (zero injeção HTML).
+4. **Autenticação Discord (OAuth2 v10)**:
+   - Login com Discord via fluxo OAuth2 v10 seguro com cookies HttpOnly assinados (HMAC-SHA256).
+   - Prova criptográfica de identidade P2P: tickets efêmeros assinados no servidor evitam personificação ou falsificação de badges de usuário verificado no chat.
+   - Reconhecimento automático de administradores/donos via `OWNER_DISCORD_IDS`.
+5. **Monetização Responsável (Google AdSense & LGPD)**:
+   - **Isolamento de rotas**: Anúncios existem exclusivamente no feed do Lobby. O palco (`/studio` e `/?room=`) utiliza CSP estrita com zero anúncios.
+   - Sem Layout Shift (CLS = 0) com slots fixos e script pré-build automatizado de `ads.txt`.
+   - Páginas legais completas em conformidade com a LGPD e políticas do Google: Privacidade (`/privacy.html`), Termos de Uso (`/terms.html`) e Contato (`/contact.html`).
+   - Contato oficial: `cupboardofdrawings@gmail.com`.
+6. **Segurança Reforçada & Chave Mestra**:
+   - Chave do anfitrião (`0604`) e criação de salas validadas exclusivamente no backend (`api/rooms.ts`), impedindo vazamento em bundles de frontend.
+   - Limite global de 2 salas simultâneas para o público geral; criação acima do limite restrita aos donos.
 
 ---
 
-## Rodar localmente
+## 🚀 Como Usar
+
+### Para o Anfitrião (Host)
+1. Acesse o Ping no Chrome, Edge ou Firefox (desktop).
+2. Opcionalmente, faça login com sua conta do Discord para exibir seu nome e avatar verificados.
+3. Clique em **Criar Sala**, defina nome, senha opcional e configurações de transmissão (30/60 FPS, até 4K).
+4. Ao clicar em **Iniciar transmissão**, selecione a tela ou janela desejada (marque *Compartilhar áudio do sistema* se desejar som).
+5. O link fixo da sala é copiado. Enquanto a sala estiver aberta, você pode pausar e retomar a live a qualquer momento sem que o link mude.
+6. Gerencie pedidos de aprovação, chute e bloqueio de participantes, além de interagir pelo chat integrado.
+
+### Para o Espectador (Viewer)
+1. Abra o link `https://seu-dominio.com.br/?room=ping-...` no computador ou celular.
+2. Digite seu apelido ou conecte seu Discord. Caso a sala possua senha ou aprovação, forneça os dados solicitados.
+3. Assista com latência ultra-baixa (< 100 ms), envie mensagens no chat e ajuste qualidade, áudio e tela cheia diretamente no player.
+
+---
+
+## 🛠️ Configuração e Variáveis de Ambiente
+
+Copie o arquivo de exemplo para configurar seu ambiente local:
 
 ```bash
-npm install
-npm run dev
+cp .env.example .env.local
 ```
 
-Abra `http://localhost:5173`, clique em **Iniciar transmissão**, copie o link da sala e abra em outra aba ou dispositivo. `localhost` é aceito pelos navegadores como contexto seguro para captura de tela (`getDisplayMedia`).
-
-### Comandos disponíveis
-
-| Comando | Descrição |
+### 1. Administração do Servidor
+| Variável | Descrição |
 |---|---|
-| `npm run dev` | Inicia o servidor de desenvolvimento Vite em `http://localhost:5173`. |
-| `npm run build` | Executa a checagem estrita de tipos (`tsc --noEmit`) e gera o bundle de produção em `dist/`. |
-| `npm run preview` | Serve o bundle gerado em `dist/` localmente para conferência. |
-| `node scripts/contrast.mjs` | Valida contrastes WCAG AA (mínimo 4.5:1 para texto e 3:1 para UI) nas 6 combinações de tema/paleta. |
-| `npm run test:e2e` | Executa a suíte de testes ponta a ponta (E2E) via Playwright cobrindo Lobby, modais, responsividade e transmissão P2P. |
+| `OWNER_KEY` | Chave mestra do anfitrião (`0604`). Permite criar salas além do limite de capacidade. |
+| `OWNER_DISCORD_IDS` | IDs de usuários do Discord com privilégios de anfitrião/dono (separados por vírgula). |
+| `SESSION_SECRET` | Chave secreta de no mínimo 32 caracteres para assinatura HMAC-SHA256 de sessões e tickets. |
 
----
-
-## Lobby e Sistema de Design (Fase L1–L4)
-
-A interface do Ping foi redesenhada com base nas especificações do Figma (`MNxrW5u2UPqTi8Fvw6dGuG`):
-
-- **Layout em 3 colunas**:
-  - **Sidebar de Navegação (esquerda)**: acesso rápido a Salas, Criar Sala, Perfil de usuário anônimo (`user{8 dígitos}`) e configurações.
-  - **Feed Central**: listagem dinâmica dividida entre **Salas Abertas** (com limite global de até 5 simultâneas) e **Salas Fechadas** (protegidas por senha).
-  - **Coluna de Anúncios (direita)**: slots responsivos (`300×250` e `300×600` no desktop; `320×100` no tablet; cards intercalados no mobile).
-- **Temas e Paletas**:
-  - Alternância instantânea entre **Modo Claro** e **Modo Escuro**.
-  - 3 paletas de marca: **Indigo**, **Teal** e **Terracota**.
-  - Persistência em `localStorage` (`ping:theme` e `ping:palette`) com script de inicialização precoce (`theme-init.js`), prevenindo qualquer flash de conteúdo não estilizado (FOUC).
-- **Acessibilidade WCAG AA**:
-  - Tecla `/` para focar rapidamente na busca de salas; `Esc` para limpar ou fechar modais.
-  - Alternador de visibilidade de senha com anúncio via leitor de tela (`aria-pressed`).
-  - Salas lotadas desabilitadas com preservação de foco e aviso auditivo.
-  - Bloqueio por 30 segundos após 3 tentativas incorretas de senha.
-
-Consulte [`DECISIONS.md`](./DECISIONS.md) para o detalhamento completo dos tokens de design, acessibilidade e arquitetura.
-
-### Monetização Responsável e Privacidade LGPD (Fase L4)
-
-- **Consentimento Prévio**: O Ping implementa banner de consentimento (`ping:cookie_consent = "accepted" | "essential"`). Nenhum anúncio ou script de terceiros é carregado sem autorização do usuário.
-- **Patrocinadores Diretos**: Suporte a criativos estéticos e sustentáveis integrados ao design do app (links com `target="_blank"` e `rel="sponsored noopener"`).
-- **Sem Layout Shift (CLS = 0)**: Slots com dimensões reservadas (`300×250`, `300×600` e `320×100`) carregados via `IntersectionObserver`.
-- **Isolamento de Transmissão**: Zero anúncios na tela de transmissão ou sobreposição de controles de vídeo. Anúncios existem estritamente no Lobby.
-
-### Configuração do Supabase (Backend Realtime - Fase L2)
-
-Para conectar o catálogo de salas e o Lobby a um banco Supabase em tempo real:
-
-1. Crie um projeto gratuito em [supabase.com](https://supabase.com).
-2. Abra o **SQL Editor** no painel do Supabase, cole o conteúdo de [`supabase/migrations/20261103_init_lobby.sql`](./supabase/migrations/20261103_init_lobby.sql) e clique em **Run**.
-3. Em **Project Settings → API**, copie a **Project URL** e a chave **anon public**.
-4. Configure no `.env.local` ou na Vercel:
+### 2. Autenticação Discord (OAuth2 v10)
+1. Acesse o [Discord Developer Portal](https://discord.com/developers/applications) e crie uma nova aplicação.
+2. Em **OAuth2 → General**, copie o **Client ID** e gere um **Client Secret**.
+3. Adicione o **Redirect URI** exato:
+   - Desenvolvimento: `http://localhost:5173/api/discord-auth?action=callback`
+   - Produção: `https://seu-dominio.com.br/api/discord-auth?action=callback`
+4. Preencha as variáveis:
    ```env
-   VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-   VITE_SUPABASE_ANON_KEY=sua-chave-anon-publica
+   DISCORD_CLIENT_ID=seu_client_id
+   DISCORD_CLIENT_SECRET=seu_client_secret
+   DISCORD_REDIRECT_URI=http://localhost:5173/api/discord-auth?action=callback
    ```
+> ⚠️ **Atenção:** O Discord OAuth2 não aceita URLs curingas (`*`). Portanto, URLs de preview da Vercel (`*-git-*.vercel.app`) não funcionam com login Discord a menos que cadastradas manualmente no portal do Discord.
 
-*(Se essas variáveis não forem preenchidas, o Ping executa normalmente com o mock local de demonstração).*
-
----
-
-## Publicar na Vercel (Checklist de Deploy)
-
-1. Suba este diretório para um repositório no GitHub, GitLab ou Bitbucket.
-2. Na Vercel, clique em **Add New → Project** e importe o repositório.
-   - O arquivo [`vercel.json`](./vercel.json) já configura automaticamente o framework Vite (`npm run build`, saída em `dist`) e os cabeçalhos de segurança (`Content-Security-Policy` com `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `Referrer-Policy` e `Permissions-Policy`).
-3. *(Opcional)* Em **Settings → Environment Variables**, configure as variáveis descritas em [`.env.example`](./.env.example) caso utilize servidor TURN ou PeerServer próprio.
-4. Após o deploy, valide o checklist:
-   - [ ] O site abre via **HTTPS** (obrigatório para `getDisplayMedia` e `crypto.subtle`).
-   - [ ] Ao clicar em **Iniciar transmissão**, o link da sala (`?room=ping-...`) é gerado e copiado.
-   - [ ] Abrindo o link em outra aba/dispositivo, o vídeo aparece e o indicador de qualidade marca **Boa**.
-   - [ ] *(Se configurou TURN)* Testar com um espectador em rede móvel 4G/5G para validar a travessia de CGNAT.
-
----
-
-## Configurando TURN
-
-Na maioria das conexões residenciais o WebRTC conecta diretamente (P2P via STUN). Porém, em cerca de **10 a 20% das redes** (operadoras com **CGNAT**, **NAT simétrico**, redes móveis 4G/5G ou firewalls corporativos), a conexão direta é bloqueada e exige um servidor **TURN** para retransmitir os pacotes.
-
-### Opção 1: Serviço TURN gerenciado (com plano gratuito)
-Provedores como **Metered TURN** (Open Relay / Metered.ca), **Cloudflare Realtime TURN** ou **Twilio Network Traversal** oferecem cotas gratuitas:
-1. Crie uma conta no provedor escolhido e gere as credenciais TURN (`urls`, `username` e `credential`).
-2. Copie `.env.example` para `.env.local` (ambiente local) ou cadastre em **Settings → Environment Variables** na Vercel:
+### 3. Cloudflare Calls (WebRTC SFU Anycast)
+1. Acesse o painel da [Cloudflare](https://dash.cloudflare.com/) e navegue até **Calls**.
+2. Crie uma nova aplicação de Calls para obter o **App ID** e o **App Secret**.
+3. Preencha as variáveis (mantidas 100% no servidor em `api/calls.ts`):
    ```env
-   VITE_TURN_URLS=turn:global.relay.metered.ca:80,turns:global.relay.metered.ca:443?transport=tcp
-   VITE_TURN_USERNAME=seu_usuario_turn
-   VITE_TURN_CREDENTIAL=sua_credencial_turn
+   CF_CALLS_APP_ID=seu_cloudflare_calls_app_id
+   CF_CALLS_APP_SECRET=seu_cloudflare_calls_app_secret
+   VITE_TRANSPORT_MODE=auto
+   ```
+   - `auto`: Tenta utilizar a Cloudflare Calls SFU. Se indisponível, cai automaticamente para P2P (Recomendado).
+   - `p2p`: Força modo P2P direto com fallback TURN.
+   - `sfu`: Força SFU sem checagem prévia.
+
+### 4. Servidores TURN / STUN (Metered.ca / OpenRelay)
+Para permitir que o modo P2P fure firewalls simétricos e CGNAT móvel 4G/5G quando a Cloudflare não for utilizada:
+1. Obtenha uma conta gratuita em [metered.ca/tools/openrelay](https://www.metered.ca/tools/openrelay/).
+2. Preencha as variáveis de servidor:
+   ```env
+   METERED_DOMAIN=seu-dominio.metered.live
+   METERED_API_KEY=sua_api_key_metered
    ```
 
-### Opção 2: Servidor próprio com `coturn`
-Se você possui uma VPS Linux com IP público (ex.: Ubuntu/Debian):
-1. Instale o `coturn`: `sudo apt update && sudo apt install coturn`.
-2. Edite `/etc/turnserver.conf`:
-   ```ini
-   listening-port=3478
-   tls-listening-port=5349
-   fingerprint
-   lt-cred-mech
-   realm=seudominio.com
-   user=usuario_turn:senha_exclusiva_turn
-   no-multicast-peers
-   no-cli
+### 5. Monetização Google AdSense & ads.txt
+1. Cadastre-se no [Google AdSense](https://adsense.google.com/).
+2. Obtenha seu ID de cliente (ex.: `ca-pub-1234567890123456`).
+3. Preencha no `.env.local`:
+   ```env
+   VITE_ADSENSE_CLIENT_ID=ca-pub-1234567890123456
    ```
-3. Libere as portas `3478` e `5349` (UDP/TCP) no firewall e preencha `VITE_TURN_URLS`, `VITE_TURN_USERNAME` e `VITE_TURN_CREDENTIAL`.
-
-> **Aviso de segurança:** Qualquer variável prefixada com `VITE_*` é incluída no código estático enviado ao navegador e **fica visível no DevTools**. Nunca coloque senhas pessoais nelas. Dê preferência a credenciais TURN temporárias (com expiração/TTL) ou configure limites de tráfego e restrição de domínio (`Origin`) no painel do seu provedor TURN.
+4. Ao rodar `npm run build`, o script `scripts/gen-ads-txt.mjs` gera automaticamente o arquivo `public/ads.txt` no formato oficial exigido pelo Google:
+   ```text
+   google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0
+   ```
+> ⚠️ **Exigência Crítica do AdSense**: O Google AdSense **não aprova** domínios de terceiros como `*.vercel.app`. Para aprovar sua conta, é obrigatório registrar um domínio próprio (ex.: `.com` ou `.com.br`), adicioná-lo ao painel da Vercel e submetê-lo à análise do Google. Além disso, as páginas legais de [Privacidade](/privacy.html), [Termos de Uso](/terms.html) e [Contato](/contact.html) já estão inclusas e acessíveis no rodapé para cumprir os requisitos de conteúdo e transparência.
 
 ---
 
-## Sinalização própria opcional (PeerServer)
+## 💻 Desenvolvimento Local
 
-Por padrão, o Ping usa o **PeerJS Cloud** (`0.peerjs.com`) gratuitamente apenas para a fase de sinalização (troca inicial de ofertas SDP e candidatos ICE). Se o servidor público estiver lento ou indisponível, você pode subir seu próprio **PeerServer** com o pacote oficial `peer` do npm.
+```bash
+# 1. Instalar dependências
+npm install
 
-> **Por que a Vercel Serverless NÃO serve para hospedar o PeerServer?**
-> A sinalização WebRTC exige conexões **WebSocket persistentes** e estado compartilhado em memória para que o anfitrião aguarde a chegada dos espectadores durante toda a sessão. Funções Serverless da Vercel são efêmeras (executam por poucos segundos e não mantêm conexões WebSocket longas nem memória compartilhada entre invocações). Por isso, a Vercel hospeda apenas o **frontend estático**, enquanto um PeerServer próprio deve rodar em um serviço que suporte processos contínuos (Node.js/Docker).
+# 2. Iniciar servidor Vite com proxy local das API routes
+npm run dev
 
-### Como subir um PeerServer gratuito (Render, Fly.io, Railway ou VPS)
+# 3. Executar checagem de tipos e build de produção
+npm run build
 
-1. Em um repositório separado ou diretamente via linha de comando num serviço Node.js/Docker gratuito, execute o pacote `peer`:
-   ```bash
-   npx peer --port 9000 --key peerjs --path /
-   ```
-   Ou com um `package.json` mínimo para deploy no **Render.com** / **Railway** / **Fly.io**:
-   ```json
-   {
-     "name": "ping-peerserver",
-     "private": true,
-     "scripts": {
-       "start": "peerjs --port ${PORT:-9000} --key peerjs --path /"
-     },
-     "dependencies": {
-       "peer": "^1.0.2"
-     }
-   }
-   ```
-2. Após publicar o serviço (que já fornece HTTPS/WSS automático na porta `443`), configure as variáveis de ambiente do Ping (`.env.local` ou painel da Vercel):
-   ```env
-   VITE_PEER_HOST=seu-peerserver.onrender.com
-   VITE_PEER_PORT=443
-   VITE_PEER_PATH=/
-   VITE_PEER_SECURE=true
-   ```
-3. Para testar localmente sem internet, rode `npx peer --port 9000 --path /` em um terminal e use no `.env.local`:
-   ```env
-   VITE_PEER_HOST=localhost
-   VITE_PEER_PORT=9000
-   VITE_PEER_PATH=/
-   VITE_PEER_SECURE=false
-   ```
+# 4. Executar suíte completa de testes E2E Playwright
+npm run test:e2e
+```
 
 ---
 
-## Limitações conhecidas
+## 🔒 Segurança e Content Security Policy (CSP)
 
-- **Navegador do anfitrião:** precisa ser um navegador desktop com suporte a `getDisplayMedia` (Chrome, Edge ou Firefox). Quem apenas assiste pode usar qualquer navegador moderno, inclusive no celular (Android e iOS).
-- **Áudio do sistema:** a captura de áudio do sistema operacional completo só é disponibilizada pelo Chrome/Edge no Windows/ChromeOS; no macOS e Linux, os navegadores permitem capturar o áudio ao compartilhar uma **aba do navegador**.
-- **Upload do anfitrião (topologia mesh 1:N):** como não há servidor intermediário de mídia (SFU), cada espectador conectado recebe um fluxo direto do anfitrião. Transmitir a 8 Mbps para 3 amigos consome até ~24 Mbps de upload.
-- **Redes restritas (CGNAT / NAT simétrico):** exigem a configuração de um servidor TURN para estabelecer conexão quando o P2P direto é bloqueado pelas operadoras.
-- **Latência real:** a latência típica do WebRTC P2P fica entre **100 e 300 ms** (dependendo da distância física, rota da operadora e codificação de vídeo) — muito baixa para conversar no Discord, mas nunca literalmente "zero delay".
+O Ping v2 implementa uma arquitetura de segurança de camada dupla via `vercel.json` e middleware de desenvolvimento do Vite:
+- **Lobby (`/`)**: CSP configurada para autorizar scripts, frames e conexões necessários para o Google AdSense, imagens de avatar do Discord (`cdn.discordapp.com`) e conexões WebRTC/WebSocket.
+- **Palco e Transmissão (`/studio` e `/?room=`)**: CSP estrita que proíbe qualquer script de publicidade ou terceiros, garantindo máxima performance, privacidade e zero distrações durante a transmissão.
+- **Zero Inline Styles**: O projeto segue o padrão rigoroso de ausência de atributos `style="..."` em HTML gerado em runtime, viabilizando o uso de `style-src 'self'`.
+
+---
+
+## 📄 Informações Legais & Contato
+
+- **Contato Oficial**: [cupboardofdrawings@gmail.com](mailto:cupboardofdrawings@gmail.com)
+- **Política de Privacidade**: `/privacy.html`
+- **Termos de Serviço**: `/terms.html`
+- **Canal de Atendimento**: `/contact.html`
