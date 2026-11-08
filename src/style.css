@@ -839,6 +839,29 @@ button.danger {
 .screen-share-tip strong {
   color: var(--text);
 }
+.p2p-human-tip {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 10px 0 14px 0;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+}
+.p2p-human-tip strong {
+  color: var(--text);
+}
+.p2p-human-tip.is-warning {
+  background: rgb(234 179 8 / 0.1);
+  border-color: rgb(234 179 8 / 0.35);
+  color: var(--text);
+}
+.p2p-human-tip.is-danger {
+  background: rgb(239 68 68 / 0.1);
+  border-color: rgb(239 68 68 / 0.35);
+  color: var(--text);
+}
 /* Ping v2: Studio do anfitrião (/studio). Só tokens, sem estilos inline, sem anúncios. */
 
 .studio {

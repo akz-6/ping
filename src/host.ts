@@ -42,7 +42,7 @@ import {
 
 const STORAGE_UPLOAD_KEY = "ping_upload_mbps";
 const DEFAULT_UPLOAD_MBPS = 50;
-const DEFAULT_MAX_VIEWERS = 2;
+const DEFAULT_MAX_VIEWERS = 3;
 const MAX_PW_ATTEMPTS = 3;
 const PW_FAILURE_DELAY_MS = 1200;
 
@@ -216,7 +216,18 @@ const TEMPLATE = `
           <input type="number" id="upload-mbps" min="1" max="10000" step="1" value="50" />
         </label>
         <label>Máximo de espectadores
-          <input type="number" id="max-viewers" min="1" max="2" step="1" value="2" />
+          <select id="max-viewers">
+            <option value="1">1 pessoa (Mais leve para sua internet)</option>
+            <option value="2">2 pessoas</option>
+            <option value="3" selected>3 pessoas (Padrão recomendado)</option>
+            <option value="4">4 pessoas</option>
+            <option value="5">5 pessoas</option>
+            <option value="6">6 pessoas</option>
+            <option value="7">7 pessoas</option>
+            <option value="8">8 pessoas (Exige internet rápida)</option>
+            <option value="10">10 pessoas (Exige fibra potente)</option>
+            <option value="12">12 pessoas (Fibra de alta velocidade)</option>
+          </select>
         </label>
         <label>Senha da sala (opcional)
           <input type="password" id="room-password" placeholder="Em branco = sem senha" autocomplete="off" />
@@ -232,6 +243,7 @@ const TEMPLATE = `
         : '<span>⚠️ <strong>Aviso de Rede:</strong> TURN não configurado. Funciona na mesma rede/Wi-Fi. Conexões em 4G/5G ou CGNAT exigem servidor TURN.</span>'}
     </div>
     <p class="muted screen-share-tip">💡 <strong>Dica contra tela preta:</strong> Para transmitir jogos, Discord, Spotify ou navegadores sem tela preta, compartilhe <strong>Tela inteira</strong> ou desative a aceleração de hardware no app compartilhado.</p>
+    <div id="p2p-human-warning" class="p2p-human-tip" role="status"></div>
     <p class="warn" id="setup-capacity-warn" role="status" hidden></p>
     <button id="start" type="button" class="primary">Iniciar transmissão</button>
     <p class="warn" id="unsupported" hidden>Este navegador não consegue compartilhar a tela. Use Chrome, Edge ou Firefox no computador. Quem só assiste pode usar qualquer navegador.</p>
@@ -367,7 +379,8 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   const statsWrap = $<HTMLElement>(root, "#stats-wrap");
   const statsBody = $<HTMLElement>(root, "#stats-body");
   const uploadInput = $<HTMLInputElement>(root, "#upload-mbps");
-  const maxViewersInput = $<HTMLInputElement>(root, "#max-viewers");
+  const maxViewersInput = $<HTMLSelectElement | HTMLInputElement>(root, "#max-viewers");
+  const p2pHumanWarnEl = root.querySelector<HTMLElement>("#p2p-human-warning");
   const passwordInput = $<HTMLInputElement>(root, "#room-password");
   const requireApprovalInput = $<HTMLInputElement>(root, "#require-approval");
   const brSelect = $<HTMLSelectElement>(root, "#br");
@@ -446,6 +459,30 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       setupCapacityWarnEl.textContent = `Aviso: 1 espectador a ${selectedBrMbps.toFixed(0)} Mbps já ultrapassa seu upload informado de ${limitMbps} Mbps.`;
     } else {
       setupCapacityWarnEl.hidden = true;
+    }
+
+    const maxV = Number(maxViewersInput.value) || DEFAULT_MAX_VIEWERS;
+    if (p2pHumanWarnEl) {
+      p2pHumanWarnEl.replaceChildren();
+      const strong = document.createElement("strong");
+      const desc = document.createElement("span");
+
+      if (maxV <= 3) {
+        p2pHumanWarnEl.className = "p2p-human-tip";
+        strong.textContent = "👥 Como funciona a transmissão: ";
+        desc.textContent = `O vídeo sai direto do seu computador para cada amigo. O padrão de ${maxV} pessoas é super leve e roda com tranquilidade na grande maioria das conexões de internet de casa.`;
+      } else if (maxV <= 5) {
+        p2pHumanWarnEl.className = "p2p-human-tip is-warning";
+        strong.textContent = `⚠️ Atenção ao número de amigos (${maxV} pessoas): `;
+        desc.textContent = `Como o vídeo sai direto do seu computador, cada amigo conectado consome um pedaço do seu upload de internet. Se sua conexão oscilar ou alguém na sua casa estiver baixando arquivos pesados, a transmissão pode começar a dar pequenos engasgos para eles. Recomendamos uma boa internet de fibra ótica.`;
+      } else {
+        p2pHumanWarnEl.className = "p2p-human-tip is-danger";
+        strong.textContent = `🚨 Muitas pessoas na sala (${maxV} pessoas): `;
+        desc.textContent = `Transmitir para tanta gente direto do seu computador exige uma internet de fibra rápida e muito estável. Com muitas pessoas conectadas, sua internet de casa pode ficar sobrecarregada e os espectadores podem ver a tela travando. Se isso acontecer, diminua a quantidade de vagas ou reduza a qualidade do vídeo nas opções acima.`;
+      }
+
+      p2pHumanWarnEl.appendChild(strong);
+      p2pHumanWarnEl.appendChild(desc);
     }
 
     const n = viewers.size;
@@ -664,6 +701,8 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   });
 
   brSelect.addEventListener("change", updateCapacityUi);
+  maxViewersInput.addEventListener("change", updateCapacityUi);
+  maxViewersInput.addEventListener("input", updateCapacityUi);
   updateCapacityUi();
 
   const send = (conn: DataConnection, msg: ToViewer): void => {
@@ -759,7 +798,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   } => {
     const rawMax = Number(maxViewersInput.value);
     const maxViewers =
-      Number.isInteger(rawMax) && rawMax >= 1 && rawMax <= 2
+      Number.isInteger(rawMax) && rawMax >= 1 && rawMax <= 30
         ? rawMax
         : DEFAULT_MAX_VIEWERS;
     const bitrateModeSelect = root.querySelector<HTMLSelectElement>("#bitrate-mode");

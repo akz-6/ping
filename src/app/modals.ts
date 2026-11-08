@@ -61,7 +61,7 @@ export function openCreateRoomModal(opts: {
 
   const dlg = openDialog({
     title: "Criar sala",
-    subtitle: "Crie uma sala para transmissão de tela (máximo 2 pessoas).",
+    subtitle: "Crie uma sala para transmissão de tela com seus amigos.",
     body: [form],
     onClose: () => {
       pass.input.value = "";

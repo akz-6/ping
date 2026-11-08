@@ -325,7 +325,7 @@ export class MockRoomService implements RoomService {
         isPrivate,
         hidden: isHidden,
         viewers: 0,
-        capacity: 2,
+        capacity: 3,
         hostToken,
       };
 
