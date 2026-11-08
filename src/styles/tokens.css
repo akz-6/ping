@@ -1,63 +1,95 @@
-/*
- * Design Tokens do Ping (Ping v2 - Black + Gray)
- * Fonte ÚNICA de tokens de cores, superfícies, tipografia, espaçamento e raios.
- * Modo padrão: Escuro (Dark).
- */
-
-:root, :root[data-theme="dark"] {
+/* Ping v2: fonte única de tokens. Nenhum outro arquivo define cor em hexadecimal. */
+:root,
+:root[data-theme="dark"] {
   --bg: #09090b;
   --bg-stage: #000000;
   --surface-1: #121214;
   --surface-2: #18181b;
-  --surface-3: #1f1f23;
-  --surface-4: #27272a;     /* hover / elevado */
+  --surface-3: #222227;
+  --surface-4: #27272a;
   --control: #1f1f22;
   --border: #27272a;
   --border-strong: #3f3f46;
   --text: #fafafa;
-  --text-2: #a1a1aa;
+  --text-2: #c4c4cc;
   --text-muted: #8b8b95;
-  --text-faint: #71717a;    /* só placeholder/decorativo */
-  --primary-bg: #fafafa;
+  --text-faint: #71717a;
+  --accent: #ffffff;
+  --accent-fg: #09090b;
+  --accent-hover: #e4e4e7;
+  --primary-bg: #ffffff;
   --primary-fg: #09090b;
   --primary-hover: #e4e4e7;
   --live: #22c55e;
-  --danger: #ef4444;
+  --live-glow: rgb(34 197 94 / 0.45);
   --discord: #5865f2;
-  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--border-strong);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --discord-hover: #4752c4;
+  --on-color: #ffffff;
+  --danger: #ef4444;
+  --danger-soft: rgb(239 68 68 / 0.14);
+  --overlay: rgb(0 0 0 / 0.66);
+  --scrim-bottom: linear-gradient(to top, rgb(0 0 0 / 0.86), rgb(0 0 0 / 0));
+
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+  --lh-tight: 1.25;
+  --lh-body: 1.5;
+
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
-  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--border-strong);
+  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.5);
+
+  --nav-w: 220px;
+  --rail-w: 320px;
+  --chat-w: 340px;
   --chat-width: 340px;
-  --z-modal: 100;
+  --header-h: 56px;
+  --z-header: 20;
   --z-osd: 50;
+  --z-modal: 100;
+  --z-toast: 200;
 
   /* Aliases semânticos para compatibilidade total */
   --card: var(--surface-2);
   --card-bg: var(--surface-2);
   --text-1: var(--text);
   --text-3: var(--text-muted);
-  --primary: var(--primary-bg);
-  --on-primary: var(--primary-fg);
+  --primary: var(--accent);
+  --on-primary: var(--accent-fg);
   --open-fg: var(--live);
-  --open-bg: rgba(34, 197, 94, 0.15);
+  --open-bg: rgb(34 197 94 / 0.15);
   --closed-fg: var(--text-2);
   --closed-bg: var(--surface-3);
   --border-hover: var(--border-strong);
-  --overlay: rgba(0, 0, 0, 0.7);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.7);
-  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.8);
-  --motion: 150ms ease-out;
-
-  /* Tipografia */
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.5);
+  --shadow-card-hover: 0 4px 12px rgb(0 0 0 / 0.7);
+  --shadow-modal: 0 16px 40px rgb(0 0 0 / 0.8);
+  --motion: var(--dur);
+  --radius-card: var(--radius-lg);
+  --radius-control: var(--radius-md);
+  --radius-pill: var(--radius-full);
   --fs-display: 24px;
   --fs-h1: 20px;
   --fs-h2: 16px;
@@ -66,15 +98,7 @@
   --fs-caption: 12px;
   --fs-overline: 11px;
 
-  /* Espaçamentos e raios estendidos */
-  --space-5: 20px;
-  --space-8: 32px;
-  --space-12: 48px;
-  --radius-card: var(--radius-lg);
-  --radius-control: var(--radius-md);
-  --radius-pill: 9999px;
-
-  /* Cores de avatares Black + Gray */
+  /* Cores determinísticas de avatar Black + Gray */
   --avatar-c0-bg: #27272a;
   --avatar-c0-fg: #fafafa;
   --avatar-c1-bg: #3f3f46;
@@ -88,14 +112,6 @@
   --avatar-c5-bg: #38383e;
   --avatar-c5-fg: #fafafa;
 
-  /* Status semântico */
-  --warning: #eab308;
-  --warning-fg: #fef08a;
-  --danger-surface: #3a1a22;
-  --danger-border: #5a2630;
-  --danger-text: #fca5a5;
-  --lime: #a3e635;
-
   color-scheme: dark;
 }
 
@@ -106,52 +122,43 @@
   --surface-2: #f4f4f5;
   --surface-3: #e4e4e7;
   --surface-4: #d4d4d8;
-  --control: #f4f4f5;
+  --control: #e4e4e7;
   --border: #e4e4e7;
   --border-strong: #a1a1aa;
   --text: #09090b;
-  --text-2: #52525b;
-  --text-muted: #71717a;
+  --text-2: #3f3f46;
+  --text-muted: #62626b;
   --text-faint: #a1a1aa;
+  --accent: #09090b;
+  --accent-fg: #fafafa;
+  --accent-hover: #27272a;
   --primary-bg: #09090b;
   --primary-fg: #fafafa;
   --primary-hover: #27272a;
-
+  --primary: var(--accent);
+  --on-primary: var(--accent-fg);
   --card: var(--surface-1);
   --card-bg: var(--surface-1);
   --text-1: var(--text);
   --text-3: var(--text-muted);
-  --primary: var(--primary-bg);
-  --on-primary: var(--primary-fg);
-  --open-fg: #15803d;
-  --open-bg: #dcfce7;
-  --closed-fg: #b45309;
-  --closed-bg: #fef3c7;
-  --border-hover: var(--border-strong);
-  --overlay: rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.15);
-
-  --avatar-c0-bg: #e4e4e7;
-  --avatar-c0-fg: #09090b;
-  --avatar-c1-bg: #d4d4d8;
-  --avatar-c1-fg: #09090b;
-  --avatar-c2-bg: #cbd5e1;
-  --avatar-c2-fg: #09090b;
-  --avatar-c3-bg: #f1f5f9;
-  --avatar-c3-fg: #09090b;
-  --avatar-c4-bg: #e2e8f0;
-  --avatar-c4-fg: #09090b;
-  --avatar-c5-bg: #e0e7ff;
-  --avatar-c5-fg: #09090b;
-
-  --warning: #ca8a04;
-  --warning-fg: #713f12;
-  --danger-surface: #fee2e2;
-  --danger-border: #fca5a5;
-  --danger-text: #991b1b;
-  --lime: #65a30d;
-
+  --overlay: rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.16);
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.08);
+  --shadow-card-hover: 0 4px 12px rgb(0 0 0 / 0.12);
+  --shadow-modal: 0 16px 40px rgb(0 0 0 / 0.2);
   color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }

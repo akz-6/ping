@@ -1,254 +1,186 @@
-/* Ping Player - Video.js Black + Gray Theme */
+/* Ping v2: skin do Video.js 8.x (classe .ping-skin) + palco do espectador.
+   Requer window.VIDEOJS_NO_DYNAMIC_STYLE = true. Nenhum estilo inline. */
 
-.video-js {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  background-color: var(--bg-stage, #000000);
-  font-family: inherit;
-  color: var(--text, #f4f4f5);
+/* Palco: player + chat */
+.ping-stage {
+  display: grid; gap: 0; min-height: calc(100vh - var(--header-h));
+  grid-template-columns: minmax(0, 1fr) var(--chat-w);
+  background: var(--bg-stage);
+}
+.ping-stage[data-chat="hidden"] { grid-template-columns: minmax(0, 1fr); }
+.ping-stage__player { position: relative; min-width: 0; background: var(--bg-stage); display: grid; place-items: center; }
+.ping-stage__frame { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: calc(100vh - var(--header-h)); }
+.ping-stage__meta {
+  position: absolute; left: 0; right: 0; bottom: 0; display: none;
+}
+.ping-stage[data-theater="true"] { grid-template-columns: minmax(0, 1fr); min-height: 100vh; }
+.ping-stage[data-theater="true"] .ping-stage__frame { height: 100vh; max-height: none; aspect-ratio: auto; }
+.ping-stage[data-theater="true"] .chat-panel { position: fixed; top: 0; right: 0; bottom: 0; width: var(--chat-w); z-index: var(--z-osd); }
+.ping-stage[data-theater="true"][data-chat="hidden"] .chat-panel { display: none; }
+
+@media (max-width: 900px) {
+  .ping-stage, .ping-stage[data-chat="hidden"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .ping-stage__frame { max-height: 56vh; }
+  .ping-stage[data-theater="true"] .chat-panel { position: static; width: auto; }
 }
 
-.video-js video {
-  object-fit: contain;
-  width: 100%;
-  height: 100%;
+/* Skin */
+.video-js,
+.video-js.ping-skin {
+  width: 100%; height: 100%;
+  background: var(--bg-stage); color: var(--text);
+  font-family: var(--font); font-size: 15px;
 }
+.video-js .vjs-tech,
+.video-js.ping-skin .vjs-tech { object-fit: contain; }
+.video-js.ping-skin .vjs-poster { background-color: var(--bg-stage); }
 
-.video-js .vjs-text-track-display {
-  pointer-events: none !important;
+/* Big play central, circular e discreto */
+.video-js.ping-skin .vjs-big-play-button {
+  top: 50%; left: 50%; margin: 0; width: 88px; height: 88px; line-height: 84px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-full);
+  background: rgb(18 18 20 / 0.72); backdrop-filter: blur(8px);
+  color: var(--text); font-size: 3.4em;
+  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-
-/* Barra de Controles */
-.video-js .vjs-control-bar {
-  display: flex;
-  align-items: center;
-  height: 52px;
-  background: linear-gradient(to top, rgba(9, 9, 11, 0.92) 0%, rgba(9, 9, 11, 0.6) 70%, transparent 100%);
-  backdrop-filter: blur(8px);
-  padding: 0 12px;
-  z-index: 20;
-  transition: opacity 0.25s ease, visibility 0.25s ease;
+.video-js.ping-skin:hover .vjs-big-play-button,
+.video-js.ping-skin .vjs-big-play-button:focus {
+  transform: translate(-50%, -50%) scale(1.06);
+  background: var(--accent); border-color: var(--accent); color: var(--accent-fg);
 }
+.video-js.ping-skin .vjs-big-play-button .vjs-icon-placeholder::before { line-height: 84px; }
 
-.video-js.vjs-user-inactive.vjs-playing .vjs-control-bar {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
+/* Barra de controle */
+.video-js .vjs-control-bar,
+.video-js.ping-skin .vjs-control-bar {
+  height: 52px; padding: 0 var(--space-3); align-items: center; gap: 2px;
+  background: var(--scrim-bottom);
+  transition: opacity var(--dur) var(--ease), visibility var(--dur) var(--ease);
 }
+.video-js .vjs-control,
+.video-js.ping-skin .vjs-control { height: 40px; width: 40px; display: inline-flex; align-items: center; justify-content: center; }
+.video-js.ping-skin .vjs-button > .vjs-icon-placeholder::before { line-height: 40px; font-size: 1.7em; }
+.video-js.ping-skin .vjs-button:hover { color: var(--accent); }
+.video-js.ping-skin .vjs-control-bar .vjs-spacer { flex: 1; display: block; }
+.video-js.vjs-user-inactive.vjs-playing .vjs-control-bar { opacity: 0; visibility: visible; pointer-events: none; }
 
+/* Volume: slider expansível ao passar o mouse ou focar */
+.video-js.ping-skin .vjs-volume-panel { width: auto; display: inline-flex; align-items: center; }
+.video-js.ping-skin .vjs-volume-panel .vjs-volume-control.vjs-volume-horizontal {
+  width: 0; opacity: 0; height: 40px; transition: width var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.video-js.ping-skin .vjs-volume-panel:hover .vjs-volume-control.vjs-volume-horizontal,
+.video-js.ping-skin .vjs-volume-panel:focus-within .vjs-volume-control.vjs-volume-horizontal,
+.video-js.ping-skin .vjs-volume-panel.vjs-slider-active .vjs-volume-control.vjs-volume-horizontal { width: 88px; opacity: 1; }
+.video-js.ping-skin .vjs-volume-bar { background: var(--border-strong); margin: 18px 10px; height: 4px; border-radius: var(--radius-full); }
+.video-js.ping-skin .vjs-volume-level { background: var(--accent); border-radius: var(--radius-full); height: 4px; }
+.video-js.ping-skin .vjs-volume-level::before { color: var(--accent); font-size: 12px; top: -4px; }
+
+/* Selo AO VIVO (componente PingLiveBadge) */
+.video-js .vjs-live-badge,
+.video-js.ping-skin .ping-live-badge {
+  width: auto; height: 28px; margin-right: var(--space-2); padding: 0 var(--space-3);
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: var(--radius-full); background: rgb(34 197 94 / 0.16); color: var(--live);
+  font-size: var(--fs-sm); font-weight: 600; cursor: default;
+}
+.video-js .vjs-live-badge .pulse-dot,
+.video-js.ping-skin .ping-live-badge::before {
+  content: ""; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--live);
+  animation: ping-breathe 2.4s var(--ease) infinite;
+}
+.video-js.ping-skin .ping-live-badge[data-state="paused"] { background: var(--surface-3); color: var(--text-muted); }
+.video-js.ping-skin .ping-live-badge[data-state="paused"]::before { background: var(--text-faint); animation: none; }
+.video-js.ping-skin .ping-live-badge[data-state="reconnecting"] { background: var(--danger-soft); color: var(--danger); }
+.video-js.ping-skin .ping-live-badge[data-state="reconnecting"]::before { background: var(--danger); }
+
+/* Botões customizados */
+.video-js.ping-skin .ping-btn-text { width: auto; min-width: 40px; padding: 0 var(--space-2); font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.video-js.ping-skin .ping-btn-text[aria-pressed="true"] { color: var(--accent); }
+.video-js.ping-skin .ping-btn-text:hover { color: var(--accent); }
+
+/* Menus popover (qualidade e FPS) */
+.video-js .vjs-quality-control,
+.video-js .vjs-fps-control,
+.video-js.ping-skin .vjs-menu-button-popup { width: auto; min-width: 56px; }
+.video-js.ping-skin .vjs-menu-button-popup .vjs-menu { left: 50%; transform: translateX(-50%); width: 0; bottom: 100%; margin-bottom: 4px; }
+.video-js.ping-skin .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
+  bottom: 0; left: 50%; transform: translateX(-50%); width: max-content; min-width: 132px; max-height: 280px;
+  padding: var(--space-1); background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-pop); font-size: var(--fs-sm);
+}
+.video-js.ping-skin .vjs-menu li {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  min-height: 34px; padding: 0 var(--space-3); border-radius: var(--radius-sm);
+  text-transform: none; text-align: left; color: var(--text-2); cursor: pointer;
+}
+.video-js.ping-skin .vjs-menu li:hover,
+.video-js.ping-skin .vjs-menu li:focus { background: var(--surface-3); color: var(--text); }
+.video-js.ping-skin .vjs-menu li.vjs-selected,
+.video-js.ping-skin .vjs-menu li.vjs-selected:hover { background: var(--surface-3); color: var(--text); font-weight: 600; }
+.video-js.ping-skin .vjs-menu li.vjs-selected::after { content: "✓"; color: var(--live); }
+.video-js.ping-skin .vjs-menu li[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
+.video-js.ping-skin .vjs-menu-title { display: none; }
+.video-js.ping-skin .ping-menu-label { font-size: var(--fs-sm); font-weight: 600; line-height: 40px; padding: 0 var(--space-2); }
+
+/* Estados globais do player */
+.video-js.ping-skin .vjs-loading-spinner { border-color: var(--border-strong); border-top-color: var(--accent); }
+.video-js.ping-skin .vjs-error-display { background: var(--overlay); }
+.video-js.ping-skin .vjs-modal-dialog { background: var(--overlay); }
+
+/* Helpers do player e testes */
 .video-js .vjs-control-bar .viewer-helpers,
 .video-js .vjs-control-bar .viewer-helpers * {
   pointer-events: auto !important;
   visibility: visible !important;
 }
 
-/* Botões da Barra */
-.video-js .vjs-button {
-  cursor: pointer;
-  color: var(--text-2, #a1a1aa);
-  transition: color 0.15s ease, background-color 0.15s ease;
-  background: transparent;
-  border: none;
-  border-radius: var(--r-sm, 4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 36px;
-  height: 36px;
-  padding: 0 6px;
-  font-size: var(--fs-body, 14px);
+/* Sobreposições: transmissão pausada, parada, som bloqueado */
+.ping-overlay,
+.host-paused-overlay,
+.host-stopped-overlay {
+  position: absolute; inset: 0; z-index: var(--z-osd); display: none;
+  flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3);
+  background: rgb(0 0 0 / 0.72); text-align: center; padding: var(--space-6);
 }
+.ping-overlay[data-visible="true"],
+.host-paused-overlay[data-visible="true"],
+.host-stopped-overlay[data-visible="true"] { display: flex; }
+.ping-overlay__title, .paused-title { margin: 0; font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.02em; }
+.ping-overlay__text { margin: 0; color: var(--text-muted); max-width: 36ch; }
+.ping-unmute { position: absolute; top: var(--space-4); left: var(--space-4); z-index: var(--z-osd); display: none; }
+.ping-unmute[data-visible="true"] { display: inline-flex; }
 
-.video-js .vjs-button:hover,
-.video-js .vjs-button:focus-visible {
-  color: var(--text, #f4f4f5);
-  background-color: var(--surface-2, #18181b);
+/* OSD de estatísticas (tecla S) */
+.ping-osd,
+#osd {
+  position: absolute; top: var(--space-4); right: var(--space-4); z-index: var(--z-osd); display: none;
+  min-width: 220px; padding: var(--space-3) var(--space-4);
+  background: rgb(18 18 20 / 0.86); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  backdrop-filter: blur(8px); font: 400 var(--fs-xs) / 1.7 var(--font-mono); color: var(--text-2);
 }
+.ping-osd[data-visible="true"],
+#osd[data-visible="true"] { display: block; }
+.ping-osd dl, #osd dl { display: grid; grid-template-columns: auto 1fr; gap: 0 var(--space-4); margin: 0; }
+.ping-osd dt, #osd dt { color: var(--text-muted); }
+.ping-osd dd, #osd dd { margin: 0; text-align: right; color: var(--text); }
+.ping-osd [data-level="warn"], #osd [data-level="warn"] { color: var(--danger); }
 
-.video-js .vjs-button.active {
-  color: var(--primary, #3b82f6);
+/* Feedback de atalho (OSD de ação) */
+.ping-toast-osd {
+  position: absolute; top: 50%; left: 50%; z-index: var(--z-osd); transform: translate(-50%, -50%);
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius-full);
+  background: rgb(18 18 20 / 0.86); border: 1px solid var(--border-strong); font-weight: 600;
+  opacity: 0; pointer-events: none; transition: opacity var(--dur) var(--ease);
 }
+.ping-toast-osd[data-visible="true"] { opacity: 1; }
 
-/* Live Badge */
-.video-js .vjs-live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background-color: var(--surface-1, #121214);
-  border: 1px solid var(--border, #27272a);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--text, #f4f4f5);
-  margin-right: 8px;
-  user-select: none;
-}
-
-.video-js .vjs-live-badge .pulse-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background-color: var(--success, #22c55e);
-  box-shadow: 0 0 8px var(--success, #22c55e);
-  animation: vjs-pulse 1.8s infinite;
-}
-
-@keyframes vjs-pulse {
-  0% { transform: scale(0.95); opacity: 0.8; }
-  50% { transform: scale(1.25); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0.8; }
-}
-
-/* Painel de Volume */
-.video-js .vjs-volume-panel {
-  display: flex;
-  align-items: center;
-  margin-right: auto;
-}
-
-.video-js .vjs-volume-control {
-  width: 5em;
-}
-
-/* Menus de Qualidade e FPS */
-.video-js .vjs-menu-button-popup {
-  position: relative;
-}
-
-.video-js .vjs-menu {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 8px;
-  display: none;
-  z-index: 30;
-}
-
-.video-js .vjs-menu-button-popup.vjs-hover .vjs-menu,
-.video-js .vjs-menu-button-popup:focus-within .vjs-menu {
-  display: block;
-}
-
-.video-js .vjs-menu-content {
-  background-color: var(--surface-1, #121214);
-  border: 1px solid var(--border, #27272a);
-  border-radius: var(--r-md, 8px);
-  padding: 4px;
-  min-width: 120px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
-  list-style: none;
-  margin: 0;
-}
-
-.video-js .vjs-menu-item {
-  padding: 6px 10px;
-  font-size: var(--fs-body, 13px);
-  color: var(--text-2, #a1a1aa);
-  border-radius: var(--r-sm, 4px);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.video-js .vjs-menu-item:hover,
-.video-js .vjs-menu-item:focus {
-  background-color: var(--surface-2, #18181b);
-  color: var(--text, #f4f4f5);
-}
-
-.video-js .vjs-menu-item.vjs-selected {
-  background-color: var(--surface-3, #27272a);
-  color: var(--text, #f4f4f5);
-  font-weight: 600;
-}
-
-.video-js .vjs-menu-item.vjs-disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-/* Rótulos dos botões personalizados */
-.video-js .vjs-quality-label,
-.video-js .vjs-fps-label,
-.video-js .vjs-theater-label,
-.video-js .vjs-stats-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-/* OSD Overlay */
-.vjs-osd-overlay {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(18, 18, 20, 0.88);
-  border: 1px solid var(--border, #27272a);
-  backdrop-filter: blur(10px);
-  border-radius: var(--r-md, 8px);
-  padding: 8px 16px;
-  color: var(--text, #f4f4f5);
-  font-size: var(--fs-body, 13px);
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 25;
-  pointer-events: auto;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-}
-
-.vjs-osd-overlay[hidden] {
-  display: none !important;
-}
-
-.vjs-osd-overlay[data-state="paused"] {
-  border-color: var(--warning, #eab308);
-  color: var(--warning, #eab308);
-}
-
-.vjs-osd-overlay[data-state="stopped"] {
-  border-color: var(--danger, #ef4444);
-  color: var(--danger, #ef4444);
-}
-
-.vjs-osd-overlay[data-state="reconnecting"] {
-  border-color: var(--primary, #3b82f6);
-  color: var(--primary, #3b82f6);
-}
-
-.vjs-unmute-prompt {
-  background-color: var(--primary, #3b82f6);
-  color: #ffffff;
-  border: none;
-  border-radius: var(--r-sm, 4px);
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* Container Queries e Responsividade */
-@container (max-width: 580px) {
-  .video-js .vjs-fps-control,
-  .video-js .vjs-theater-control {
-    display: none !important;
-  }
-}
-
-@media (max-width: 580px) {
-  .video-js .vjs-fps-control,
-  .video-js .vjs-theater-control {
-    display: none !important;
-  }
+/* Responsivo do player */
+@media (max-width: 700px) {
+  .video-js.ping-skin .vjs-control-bar { height: 48px; padding: 0 var(--space-2); }
+  .video-js.ping-skin .ping-fps-menu,
+  .video-js.ping-skin .ping-theater-btn { display: none; }
+  .video-js.ping-skin .vjs-volume-panel .vjs-volume-control.vjs-volume-horizontal { display: none; }
+  .video-js.ping-skin .vjs-big-play-button { width: 72px; height: 72px; line-height: 68px; }
 }
