@@ -1,3 +1,4 @@
+import { withAvatarSize } from "./avatar";
 import { Banner } from "./components";
 import { append, discordIcon, h } from "./dom";
 import {
@@ -374,7 +375,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     const val = nick.input.value.trim();
     const typed = val || profile.displayName || profile.handle;
     handleLabel.textContent = typed;
-    avatarWrap.replaceChildren(Avatar(typed, 72, profile.avatarUrl));
+    avatarWrap.replaceChildren(Avatar(typed, 72, profile.avatarUrl ? withAvatarSize(profile.avatarUrl, 256) : undefined));
     badgeLabel.textContent = profile.discordLinked
       ? `Discord: @${profile.discordUsername || "conectado"}`
       : !val || val === profile.handle
@@ -404,7 +405,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
   const renderDiscordSlot = (): void => {
     discordSlot.replaceChildren();
     if (profile.discordLinked) {
-      const unlinkBtn = Button("Desconectar", {
+      const unlinkBtn = Button("Desconectar Discord", {
         variant: "secondary",
         id: "btn-unlink-discord",
         onClick: () => {

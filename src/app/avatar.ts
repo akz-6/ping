@@ -39,6 +39,7 @@ export function renderAvatar(opts: {
 
   if (isSafeAvatarUrl(opts.url)) {
     const img = document.createElement('img');
+    img.className = 'chat-avatar';
     img.alt = '';
     img.decoding = 'async';
     img.loading = 'lazy';

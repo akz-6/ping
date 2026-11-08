@@ -260,3 +260,15 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: msg });
   }
 }
+
+export async function lookupRoom(roomId: string): Promise<{ id: string; name: string; visible: boolean; hasPassword: boolean } | null> {
+  const rooms = await getStoredRooms();
+  const found = rooms.find((r) => r.id === roomId);
+  if (!found) return null;
+  return {
+    id: found.id,
+    name: found.name,
+    visible: !found.hidden,
+    hasPassword: Boolean(found.password || found.isPrivate),
+  };
+}

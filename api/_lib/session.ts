@@ -143,3 +143,15 @@ export function isOwnerDiscord(discordId?: string): boolean {
   if (!discordId) return false;
   return getOwnerDiscordIds().includes(discordId);
 }
+
+export function readSession(cookieHeader?: string | string[]): (SessionData & { avatarUrl: string }) | null {
+  const cookies = parseCookies(cookieHeader);
+  const token = cookies.ping_session;
+  if (!token) return null;
+  const payload = verifyPayload<SessionData>(token);
+  if (!payload || !payload.discordId) return null;
+  return {
+    ...payload,
+    avatarUrl: getDiscordAvatarUrl(payload.discordId, payload.avatar),
+  };
+}

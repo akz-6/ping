@@ -1,3 +1,4 @@
+import { registerUser } from "./_lib/users.js";
 import crypto from "node:crypto";
 import {
   getSessionSecret,
@@ -147,6 +148,19 @@ export default async function handler(req: any, res: any) {
         global_name?: string | null;
         avatar?: string | null;
       };
+
+      
+      const avatarUrl = getDiscordAvatarUrl(user.id, user.avatar);
+      try {
+        await registerUser({
+          discordId: user.id,
+          username: user.username,
+          displayName: user.global_name || user.username,
+          avatarUrl,
+        });
+      } catch (err) {
+        console.warn("registerUser failed:", err);
+      }
 
       const sessionPayload: SessionData = {
         discordId: user.id,

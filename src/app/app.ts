@@ -1,3 +1,7 @@
+import { FriendsService } from "../social/friends-service";
+import { mountFriendsPanel } from "../social/friends-panel";
+import type { PingProfile } from "../social/types";
+import type { UserProfile } from "./identity";
 
 import { toast } from "../ui";
 import {
@@ -22,6 +26,29 @@ import { getConsentStatus, openConsentBanner } from "./services/ads";
 type Status = "loading" | "ready" | "error";
 
 export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | "host" }): void {
+  const friendsService = new FriendsService();
+  const friendsContainer = h("div", { class: "friends-panel-wrap" });
+
+  let unmountFriends: (() => void) | null = null;
+  const updateFriends = (p: UserProfile, configured = true) => {
+    unmountFriends?.();
+    const pingProf: PingProfile | null = (p.discordLinked && p.discordId)
+      ? {
+          discordId: p.discordId,
+          username: p.discordUsername || p.handle,
+          displayName: p.displayName,
+          avatarUrl: p.avatarUrl || "",
+        }
+      : null;
+    unmountFriends = mountFriendsPanel({
+      root: friendsContainer,
+      service: friendsService,
+      profile: pingProf,
+      discordConfigured: configured,
+      toast: (msg, kind) => toast(msg, kind || "info"),
+    });
+  };
+
   const service = createRoomService();
   const handle = getProfile().displayName || getHandle();
 
@@ -171,7 +198,7 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
 
   const navigate = (id: NavId): void => {
     if (id === "create") onCreate();
-    else if (id === "profile") openProfileModal({ handle, onSaved: (p) => sidebar.updateProfile(p) });
+    else if (id === "profile") openProfileModal({ handle, onSaved: (p) => { sidebar.updateProfile(p); updateFriends(p); } });
     else showLobby();
   };
 
@@ -300,7 +327,8 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
   const main = h("main", { class: "main", id: "main" }, lobby, hostView);
   const adsRight = h(
     "aside",
-    { class: "ads-right", "aria-label": "Publicidade" },
+    { class: "ads-right ping-rail", "aria-label": "Painel Lateral e Amigos" },
+    friendsContainer,
     AdSlot("300x250"),
     AdSlot("300x600"),
   );
@@ -320,13 +348,20 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
     history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search);
     if (loginParam === "ok") {
       void syncDiscordSession().then((p) => {
+        if (p) updateFriends(p);
         toast(`Conectado ao Discord com sucesso! (@${p.discordUsername || "user"})`);
       });
     } else {
       toast("Falha na autenticação com o Discord.", "error");
     }
   } else {
-    void syncDiscordSession();
+    void syncDiscordSession().then((p) => {
+      if (p) updateFriends(p);
+    });
+    fetch("/api/discord-auth?action=status")
+      .then((r) => r.json())
+      .then((d) => updateFriends(getProfile(), Boolean(d?.configured)))
+      .catch(() => updateFriends(getProfile(), false));
   }
 
   window.addEventListener("popstate", () => {
