@@ -9,7 +9,7 @@ import {
   isOwnerDiscord,
   type SessionData,
   type TicketData,
-} from "./_lib/session";
+} from "./_lib/session.js";
 
 function sendJson(res: any, status: number, data: any) {
   if (typeof res.status === "function" && typeof res.json === "function") {

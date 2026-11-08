@@ -5,7 +5,7 @@ import {
   parseCookies,
   isOwnerDiscord,
   type SessionData,
-} from "./_lib/session";
+} from "./_lib/session.js";
 
 export interface StoredRoom {
   id: string;
