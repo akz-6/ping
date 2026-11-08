@@ -96,6 +96,13 @@ export function SidebarNav(opts: {
     profileBtn.setAttribute("aria-label", `Abrir perfil de ${p.displayName}`);
     avatarWrap.replaceChildren(Avatar(p.displayName, 36, p.avatarUrl));
     nameEl.textContent = p.displayName;
+    if (p.discordLinked) {
+      profileBtn.setAttribute("data-verified", "true");
+      badgeEl.setAttribute("data-verified", "true");
+    } else {
+      profileBtn.removeAttribute("data-verified");
+      badgeEl.removeAttribute("data-verified");
+    }
     badgeEl.textContent = p.discordLinked
       ? (p.discordUsername ? `@${p.discordUsername}` : "Discord")
       : (p.displayName === p.handle ? "Anônimo" : "Personalizado");

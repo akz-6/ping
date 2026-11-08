@@ -1091,7 +1091,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         hostTransport = null;
       }
 
-      linkInput.value = `${location.origin}${location.pathname}?room=${openedId}`;
+      linkInput.value = `${location.origin}/?room=${openedId}`;
       setup.hidden = true;
       live.hidden = false;
       hostStoppedOverlay.hidden = true;

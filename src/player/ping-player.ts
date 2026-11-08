@@ -70,6 +70,8 @@ export class PingPlayer {
       controlBar: {
         progressControl: false,
         playToggle: false,
+        liveDisplay: false,
+        seekToLive: false,
         remainingTimeDisplay: false,
         currentTimeDisplay: false,
         durationDisplay: false,
@@ -119,8 +121,9 @@ export class PingPlayer {
       leaveLink.textContent = "← Salas";
       cbEl.insertBefore(leaveLink, cbEl.firstChild);
 
-      // Live Badge no início
-      this.liveBadge = cb.addChild("PingLiveBadge", {}, 1) as PingLiveBadge;
+      // Live Badge no início, logo após o botão de voltar às salas
+      this.liveBadge = cb.addChild("PingLiveBadge", {}, 0) as PingLiveBadge;
+      cbEl.insertBefore(leaveLink, cbEl.firstChild);
 
       // Botões customizados à direita
       this.qualityMenu = cb.addChild("PingQualityMenu", {}) as unknown as PingQualityMenu;
@@ -129,7 +132,7 @@ export class PingPlayer {
       this.chatBtn = cb.addChild("PingChatButton", {}) as unknown as PingChatButton;
       this.theaterBtn = cb.addChild("PingTheaterButton", {}) as unknown as PingTheaterButton;
 
-      // Adiciona IDs aos botões padrão para compatibilidade com seletores
+      // Adiciona IDs aos botões padrão e posiciona no extremo direito
       const pipComp = cb.getChild("pictureInPictureToggle");
       if (pipComp) {
         const pipEl = pipComp.el();
@@ -138,6 +141,7 @@ export class PingPlayer {
           pipEl.setAttribute("title", "Janela flutuante / Popout (P)");
           pipEl.setAttribute("aria-label", "Assistir em janela flutuante (Popout)");
           pipEl.textContent = "Popout";
+          cbEl.appendChild(pipEl);
         }
       }
 
@@ -147,6 +151,7 @@ export class PingPlayer {
         if (fsEl) {
           fsEl.id = "fs";
           fsEl.setAttribute("title", "Alternar tela cheia (F)");
+          cbEl.appendChild(fsEl);
         }
       }
     }

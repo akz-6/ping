@@ -24,7 +24,6 @@ import {
   type ThemeChoice,
 } from "../theme";
 import { toast } from "../ui";
-import { getConsentStatus, resetConsent, openConsentBanner } from "./services/ads";
 import { isPwaInstallable, promptPwaInstall } from "./services/pwa";
 
 /* ---------- ModalCriarSala ---------- */
@@ -376,6 +375,11 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     const typed = val || profile.displayName || profile.handle;
     handleLabel.textContent = typed;
     avatarWrap.replaceChildren(Avatar(typed, 72, profile.avatarUrl ? withAvatarSize(profile.avatarUrl, 256) : undefined));
+    if (profile.discordLinked) {
+      badgeLabel.setAttribute("data-verified", "true");
+    } else {
+      badgeLabel.removeAttribute("data-verified");
+    }
     badgeLabel.textContent = profile.discordLinked
       ? `Discord: @${profile.discordUsername || "conectado"}`
       : !val || val === profile.handle
@@ -478,7 +482,6 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
   );
 
   const privacyBox = h("div", { class: "profile-privacy-box" });
-  const consentSt = getConsentStatus();
   privacyBox.append(
     h("span", { class: "field-label" }, "Privacidade & Anúncios"),
     h(
@@ -487,20 +490,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
       h(
         "span",
         { class: "profile-privacy-text" },
-        consentSt === "accepted" ? "Anúncios permitidos (apoia a plataforma)" : "Apenas itens essenciais",
-      ),
-      h(
-        "button",
-        {
-          type: "button",
-          class: "btn btn-secondary btn-sm",
-          onClick: () => {
-            dlg.close();
-            resetConsent();
-            openConsentBanner();
-          },
-        },
-        "Gerenciar preferências",
+        "Anúncios ativos (mantêm o Ping gratuito). Em breve: opção de remover anúncios apoiando o projeto com uma doação.",
       ),
     ),
   );

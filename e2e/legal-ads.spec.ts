@@ -45,7 +45,7 @@ test.describe("Fase 7 — Páginas Legais & AdSense (Lobby Only)", () => {
     await expect(footer.locator('a[href="/contact.html"]')).toHaveText("Contato");
   });
 
-  test("banner de consentimento: rejeitar ('Apenas essenciais') não carrega script do AdSense", async ({ page }) => {
+  test("banner de aviso: sem botão de rejeitar ('Apenas essenciais') pois anúncios são obrigatórios no Lobby", async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.clear();
     });
@@ -55,19 +55,13 @@ test.describe("Fase 7 — Páginas Legais & AdSense (Lobby Only)", () => {
     await expect(banner).toBeVisible();
 
     const essentialBtn = page.locator("#consent-btn-essential");
-    await essentialBtn.click();
+    await expect(essentialBtn).toHaveCount(0);
+
+    const acceptBtn = page.locator("#consent-btn-accept");
+    await expect(acceptBtn).toBeVisible();
+    await acceptBtn.click();
 
     await expect(banner).toBeHidden();
-
-    const consentVal = await page.evaluate(() => localStorage.getItem("ping:cookie_consent"));
-    expect(consentVal).toBe("essential");
-
-    // Script do AdSense não pode existir
-    const adsScript = await page.locator('script[src*="pagead2.googlesyndication.com"]').count();
-    expect(adsScript).toBe(0);
-
-    const adsIns = await page.locator("ins.adsbygoogle").count();
-    expect(adsIns).toBe(0);
   });
 
   test("banner de consentimento: aceitar grava consentimento e tenta carregar AdSense", async ({ page }) => {

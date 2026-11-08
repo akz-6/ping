@@ -57,9 +57,15 @@ export class PingQualityMenu extends (MenuButton as any) {
     el.setAttribute("id", "quality-menu-btn");
 
     this.labelSpan = document.createElement("span");
-    this.labelSpan.className = "vjs-quality-label";
+    this.labelSpan.className = "vjs-quality-label ping-menu-label";
     this.labelSpan.textContent = "Auto";
-    el.appendChild(this.labelSpan);
+    const btn = el.querySelector("button") || el;
+    const iconHolder = btn.querySelector(".vjs-icon-placeholder");
+    if (iconHolder) {
+      iconHolder.replaceWith(this.labelSpan);
+    } else {
+      btn.insertBefore(this.labelSpan, btn.firstChild);
+    }
 
     return el;
   }

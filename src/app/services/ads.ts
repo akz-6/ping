@@ -78,7 +78,7 @@ export function saveConsent(status: "accepted" | "essential"): void {
 }
 
 export function hasAdConsent(): boolean {
-  return getConsentStatus() === "accepted";
+  return true;
 }
 
 export function resetConsent(): void {
@@ -499,23 +499,12 @@ export function openConsentBanner(onDecision?: (status: "accepted" | "essential"
         h(
           "p",
           { class: "consent-desc" },
-          "O Ping utiliza armazenamento local para guardar suas preferências e exibe anúncios de patrocinadores para manter a plataforma e a transmissão P2P gratuitas. Ao aceitar, você apoia o projeto.",
+          "O Ping utiliza armazenamento local para guardar suas preferências e exibe anúncios de patrocinadores para manter a plataforma e a transmissão gratuitas. Em breve será possível remover os anúncios mediante doação ao projeto.",
         ),
       ),
       h(
         "div",
         { class: "consent-actions" },
-        h(
-          "button",
-          {
-            type: "button",
-            class: "btn btn-secondary btn-sm consent-btn-essential",
-            id: "consent-btn-essential",
-            "aria-label": "Continuar usando apenas dados essenciais",
-            onClick: () => handleDecision("essential"),
-          },
-          "Apenas essenciais",
-        ),
         h(
           "button",
           {

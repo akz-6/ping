@@ -203,6 +203,7 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
   };
 
   const sidebar = SidebarNav({ handle, onNavigate: navigate });
+  sidebar.updateProfile(getProfile());
   const bottom = BottomNav(navigate);
 
   const search = SearchInput((q) => {

@@ -64,9 +64,15 @@ export class PingFpsMenu extends (MenuButton as any) {
     el.setAttribute("id", "fps-menu-btn");
 
     this.labelSpan = document.createElement("span");
-    this.labelSpan.className = "vjs-fps-label";
+    this.labelSpan.className = "vjs-fps-label ping-menu-label";
     this.labelSpan.textContent = "FPS";
-    el.appendChild(this.labelSpan);
+    const btn = el.querySelector("button") || el;
+    const iconHolder = btn.querySelector(".vjs-icon-placeholder");
+    if (iconHolder) {
+      iconHolder.replaceWith(this.labelSpan);
+    } else {
+      btn.insertBefore(this.labelSpan, btn.firstChild);
+    }
 
     return el;
   }

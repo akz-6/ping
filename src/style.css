@@ -1,8 +1,8 @@
 /* Compatibilidade: telas legadas (host e viewer) usam nomes antigos mapeados para os tokens. */
 .legacy {
-  --panel: var(--card);
-  --panel-2: var(--bg);
-  --line: var(--border);
+  --panel: var(--surface-1);
+  --panel-2: var(--surface-2);
+  --line: var(--border-strong);
   --text: var(--text-1);
   --muted: var(--text-2);
   --accent: var(--primary);
@@ -14,7 +14,7 @@
   --bg: var(--bg-stage);
   --panel: var(--surface-1);
   --panel-2: var(--surface-2);
-  --line: var(--border);
+  --line: var(--border-strong);
   --text: var(--text);
   --muted: var(--text-muted);
   --accent: var(--primary-bg);
@@ -109,18 +109,36 @@ body {
   .grid { grid-template-columns: 1fr; }
 }
 
-.legacy label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
-.legacy label.check { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); }
+.legacy label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.legacy label.check { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; color: var(--text); cursor: pointer; }
 .advanced-check { margin-top: 12px; }
 
-.legacy select, .legacy input[type="text"], .legacy input[type="number"], .legacy input[type="password"], .legacy input:not([type]), .legacy input[readonly] {
+.legacy select:not(.viewer-quality-select),
+.legacy input[type="text"]:not(.chat-input):not(.search-input),
+.legacy input[type="number"],
+.legacy input[type="password"],
+.legacy input[readonly] {
   width: 100%;
-  background: var(--panel-2);
+  min-height: 44px;
+  background: var(--surface-2);
   color: var(--text);
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   font: inherit;
+  font-weight: 600;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.legacy select option {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 500;
+}
+.legacy select:hover,
+.legacy input[type="text"]:hover,
+.legacy input[type="number"]:hover,
+.legacy input[type="password"]:hover {
+  border-color: var(--text-muted);
 }
 
 .advanced {
@@ -212,31 +230,50 @@ body {
   text-align: left;
 }
 
-.legacy button {
+.legacy button:not(.vjs-control):not(.vjs-button):not(.chat-send-btn):not(.chat-close-btn):not(.btn) {
   font: inherit;
+  font-weight: 600;
   color: var(--text);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 10px 16px;
   cursor: pointer;
-  transition: filter 0.15s, transform 0.05s;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
 .legacy button.sm {
-  padding: 5px 10px;
+  padding: 6px 12px;
   font-size: 12px;
   border-radius: 8px;
 }
-.legacy button:hover { filter: brightness(1.15); }
+.legacy button:not(.vjs-control):not(.vjs-button):hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--text-muted);
+}
 .legacy button:active { transform: translateY(1px); }
 .legacy button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.legacy button.primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border-color: transparent;
-  font-weight: 600;
+.legacy button.primary,
+button.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 1px solid var(--accent);
+  font-weight: 700;
+  min-height: 46px;
 }
-.legacy button.danger { background: var(--danger-surface); border-color: var(--danger-border); color: var(--danger-text); }
+.legacy button.primary:hover:not(:disabled),
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-fg);
+}
+.legacy button.danger,
+button.danger {
+  background: var(--danger-surface);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+  font-weight: 700;
+}
 
 .row { display: flex; gap: 10px; align-items: center; }
 .row.between { justify-content: space-between; }
