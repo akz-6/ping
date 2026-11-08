@@ -1,4 +1,5 @@
-﻿import { initTheme } from "./theme";
+import "./player/bootstrap";
+import { initTheme } from "./theme";
 import { registerServiceWorker } from "./app/services/pwa";
 import { checkUrlForCreatorKey } from "./app/auth-gate";
 

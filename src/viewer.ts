@@ -20,6 +20,7 @@ import {
   type ViewerDiagnosticSample,
 } from "./stats";
 import { $, copyText, shortId } from "./ui";
+import { PingPlayer } from "./player/ping-player";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BACKOFF_MS = [1000, 2000, 3000, 5000, 8000];
@@ -65,7 +66,6 @@ function formatDeniedMessage(reason: DeniedReason | undefined): string {
 const TEMPLATE = `
 <main class="viewer" aria-label="Reprodutor da transmissão">
   <video id="v" autoplay playsinline muted></video>
-  <div class="discord-live-pill" id="live-badge" hidden><span class="pulse-dot"></span> AO VIVO</div>
   <div id="pause-overlay" class="paused-overlay" hidden>
     <div class="paused-card">
       <span class="paused-icon">⏸️</span>
@@ -115,7 +115,6 @@ const TEMPLATE = `
       </div>
     </div>
   </div>
-  <div id="osd" class="viewer-osd" role="status" aria-live="polite" hidden></div>
   <div id="status" class="status" role="status" aria-live="polite">Conectando…</div>
   <div id="auth-wrap" class="status" hidden>
     <form id="auth-form" class="card auth-card">
@@ -125,8 +124,7 @@ const TEMPLATE = `
       <button id="auth-submit" type="submit" class="primary">Entrar</button>
     </form>
   </div>
-  <div class="bar bar-visible" id="bar" role="region" aria-label="Controles de reprodução" hidden>
-    <a id="leave" href="/" class="btn-leave-room" title="Sair da sala e voltar ao Lobby">← Salas</a>
+  <div class="viewer-helpers" hidden>
     <button id="sound" type="button" title="Ativar ou silenciar som (M)">Ativar som</button>
     <input id="vol" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
     <span id="quality" class="quality" data-level="good" role="status" aria-label="Qualidade da conexão: Boa" title="Qualidade da conexão">Boa</span>
@@ -144,9 +142,6 @@ const TEMPLATE = `
     </select>
     <span id="stats" class="stats" aria-live="off"></span>
     <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico da conexão em JSON">Diagnóstico</button>
-    <button id="theater" type="button" title="Alternar Modo Teatro (T)">Teatro</button>
-    <button id="pip" type="button" title="Janela flutuante / Popout (P)" aria-label="Assistir em janela flutuante (Popout)">Popout</button>
-    <button id="fs" type="button" title="Alternar tela cheia (F)">Tela cheia</button>
   </div>
 </main>
 `;
@@ -156,27 +151,21 @@ export function mountViewer(root: HTMLElement, room: string): void {
   root.innerHTML = TEMPLATE;
 
   const video = $<HTMLVideoElement>(root, "#v");
-  const osdEl = $<HTMLElement>(root, "#osd");
+  const container = $<HTMLElement>(root, ".viewer");
   const statusEl = $<HTMLElement>(root, "#status");
   const authWrap = $<HTMLElement>(root, "#auth-wrap");
   const authForm = $<HTMLFormElement>(root, "#auth-form");
   const authMsg = $<HTMLElement>(root, "#auth-msg");
   const authPw = $<HTMLInputElement>(root, "#auth-pw");
   const authSubmit = $<HTMLButtonElement>(root, "#auth-submit");
-  const bar = $<HTMLElement>(root, "#bar");
   const soundBtn = $<HTMLButtonElement>(root, "#sound");
   const vol = $<HTMLInputElement>(root, "#vol");
   const qualityEl = $<HTMLElement>(root, "#quality");
   const statsEl = $<HTMLElement>(root, "#stats");
   const copyDiagBtn = $<HTMLButtonElement>(root, "#copy-diag");
-  const pipBtn = $<HTMLButtonElement>(root, "#pip");
-  const fsBtn = $<HTMLButtonElement>(root, "#fs");
-  const container = $<HTMLElement>(root, ".viewer");
-  const liveBadge = $<HTMLElement>(root, "#live-badge");
   const pauseOverlay = $<HTMLElement>(root, "#pause-overlay");
   const discordStatsModal = $<HTMLElement>(root, "#discord-stats-modal");
   const closeStatsBtn = $<HTMLButtonElement>(root, "#close-stats");
-  const theaterBtn = $<HTMLButtonElement>(root, "#theater");
   const dsStatus = $<HTMLElement>(root, "#ds-status");
   const dsRtt = $<HTMLElement>(root, "#ds-rtt");
   const dsBitrate = $<HTMLElement>(root, "#ds-bitrate");
@@ -184,19 +173,36 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const dsCodec = $<HTMLElement>(root, "#ds-codec");
   const dsPreset = $<HTMLElement>(root, "#ds-preset");
   const qualitySelect = $<HTMLSelectElement>(root, "#quality-preset");
+  const fpsSelect = $<HTMLSelectElement>(root, "#fps-selector");
+  const dsChosenFps = $<HTMLElement>(root, "#ds-chosen-fps");
   const diagnosticBuffer = new CircularBuffer<ViewerDiagnosticSample>(300);
 
   let currentPreset: QualityPreset = "source";
-  try {
-    const saved = localStorage.getItem("ping_viewer_quality") as QualityPreset | null;
-    if (saved && PRESET_ORDER.includes(saved)) {
-      currentPreset = saved;
-      qualitySelect.value = saved;
-      dsPreset.textContent = PRESET_LABELS[saved];
+  let hostMaxFps = 60;
+  let currentFpsChoice: string = "auto";
+  let osdTimer: number | undefined;
+
+  let pingPlayer: PingPlayer;
+
+  const showOsd = (text: string): void => {
+    pingPlayer?.showToast(text);
+  };
+
+  const toggleTheater = (force?: boolean): void => {
+    const isNow = typeof force === "boolean" ? force : !container.classList.contains("theater-mode");
+    container.classList.toggle("theater-mode", isNow);
+    pingPlayer?.setTheaterState(isNow);
+    const thBtn = root.querySelector<HTMLButtonElement>("#theater");
+    if (thBtn) thBtn.classList.toggle("active", isNow);
+    showOsd(isNow ? "🎭 Modo Teatro ativado" : "Modo Teatro normal");
+  };
+
+  const toggleStatsModal = (): void => {
+    discordStatsModal.hidden = !discordStatsModal.hidden;
+    if (!discordStatsModal.hidden) {
+      showOsd("📶 Estatísticas da Transmissão");
     }
-  } catch {
-    // ignore
-  }
+  };
 
   const setQualityPreset = (preset: QualityPreset, notify = true): void => {
     currentPreset = preset;
@@ -213,7 +219,115 @@ export function mountViewer(root: HTMLElement, room: string): void {
     if (notify) {
       showOsd(`Qualidade: ${PRESET_LABELS[preset]}`);
     }
+    pingPlayer?.setQuality(preset);
   };
+
+  const setFpsChoice = (choice: string, notify = true): void => {
+    currentFpsChoice = choice;
+    fpsSelect.value = choice;
+    try {
+      localStorage.setItem("ping_viewer_fps", choice);
+    } catch {
+      // ignore
+    }
+
+    const targetFps = choice === "auto" ? hostMaxFps : Number(choice);
+    dsChosenFps.textContent = choice === "auto" ? `Auto (${hostMaxFps} FPS)` : `${choice} FPS`;
+
+    if (conn && conn.open) {
+      void conn.send({ t: "fps-cap", fps: targetFps } satisfies ToHost);
+    }
+    if (notify) {
+      showOsd(choice === "auto" ? `FPS: Auto (${hostMaxFps} FPS)` : `FPS limitado a: ${choice} FPS`);
+    }
+    pingPlayer?.setFps(choice === "auto" ? "auto" : Number(choice));
+  };
+
+  const toggleMute = (): void => {
+    if (video.muted || video.volume === 0) {
+      video.muted = false;
+      if (video.volume === 0) {
+        video.volume = 1;
+        vol.value = "1";
+      }
+      void video.play().catch(() => {
+        video.muted = true;
+        syncSoundUi();
+      });
+    } else {
+      video.muted = true;
+    }
+    syncSoundUi();
+  };
+
+  const toggleFullscreen = (): void => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined);
+      return;
+    }
+    if (typeof container.requestFullscreen === "function") {
+      void container.requestFullscreen().catch(() => {
+        const webkitVideo = video as HTMLVideoElement & {
+          webkitEnterFullscreen?: () => void;
+        };
+        webkitVideo.webkitEnterFullscreen?.();
+      });
+      return;
+    }
+    const webkitVideo = video as HTMLVideoElement & {
+      webkitEnterFullscreen?: () => void;
+    };
+    webkitVideo.webkitEnterFullscreen?.();
+  };
+
+  pingPlayer = new PingPlayer(video, {
+    onQualityChange: (preset) => setQualityPreset(preset, true),
+    onQualityCycle: () => {
+      const currentIdx = PRESET_ORDER.indexOf(currentPreset);
+      const nextIdx = (currentIdx + 1) % PRESET_ORDER.length;
+      setQualityPreset(PRESET_ORDER[nextIdx], true);
+      showBarTemporarily();
+    },
+    onFpsChange: (fps) => setFpsChoice(String(fps), true),
+    onOpenStats: () => toggleStatsModal(),
+    onTheaterChange: () => toggleTheater(),
+    onMuteToggle: () => {
+      toggleMute();
+      showOsd(video.muted ? "🔇 Silenciado" : "🔊 Áudio ativado");
+    },
+    onFullscreenToggle: () => {
+      toggleFullscreen();
+      showOsd(document.fullscreenElement ? "🔲 Janela normal" : "🔲 Tela cheia");
+    },
+  });
+
+  const osdEl = $<HTMLElement>(root, "#osd");
+  const bar = $<HTMLElement>(root, "#bar");
+  bar.hidden = true;
+  const pipBtn = $<HTMLButtonElement>(root, "#pip");
+  const fsBtn = $<HTMLButtonElement>(root, "#fs");
+  const liveBadge = $<HTMLElement>(root, "#live-badge");
+
+  const helpers = root.querySelector(".viewer-helpers");
+  if (helpers && bar) {
+    bar.appendChild(helpers);
+    helpers.removeAttribute("hidden");
+  }
+
+  qualityEl.addEventListener("click", () => toggleStatsModal());
+  qualityEl.style.cursor = "pointer";
+
+  try {
+    const saved = localStorage.getItem("ping_viewer_quality") as QualityPreset | null;
+    if (saved && PRESET_ORDER.includes(saved)) {
+      currentPreset = saved;
+      qualitySelect.value = saved;
+      dsPreset.textContent = PRESET_LABELS[saved];
+      pingPlayer.setQuality(saved);
+    }
+  } catch {
+    // ignore
+  }
 
   qualitySelect.addEventListener("change", () => {
     const val = qualitySelect.value as QualityPreset;
@@ -221,10 +335,6 @@ export function mountViewer(root: HTMLElement, room: string): void {
     showBarTemporarily();
   });
 
-  const fpsSelect = $<HTMLSelectElement>(root, "#fps-selector");
-  const dsChosenFps = $<HTMLElement>(root, "#ds-chosen-fps");
-  let hostMaxFps = 60;
-  let currentFpsChoice: string = "auto";
   try {
     const savedFps = localStorage.getItem("ping_viewer_fps");
     if (savedFps) {
@@ -260,26 +370,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
       fpsSelect.value = "auto";
       dsChosenFps.textContent = `Auto (${maxFps} FPS)`;
     }
-  };
-
-  const setFpsChoice = (choice: string, notify = true): void => {
-    currentFpsChoice = choice;
-    fpsSelect.value = choice;
-    try {
-      localStorage.setItem("ping_viewer_fps", choice);
-    } catch {
-      // ignore
-    }
-
-    const targetFps = choice === "auto" ? hostMaxFps : Number(choice);
-    dsChosenFps.textContent = choice === "auto" ? `Auto (${hostMaxFps} FPS)` : `${choice} FPS`;
-
-    if (conn && conn.open) {
-      void conn.send({ t: "fps-cap", fps: targetFps } satisfies ToHost);
-    }
-    if (notify) {
-      showOsd(choice === "auto" ? `FPS: Auto (${hostMaxFps} FPS)` : `FPS limitado a: ${choice} FPS`);
-    }
+    pingPlayer?.setHostMaxFps(maxFps);
   };
 
   fpsSelect.addEventListener("change", () => {
@@ -294,6 +385,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
     const isMuted = video.muted || video.volume === 0;
     soundBtn.textContent = isMuted ? "Ativar som" : "Silenciar";
   };
+  video.addEventListener("volumechange", syncSoundUi);
 
   let barHideTimer: number | undefined;
 
@@ -316,20 +408,6 @@ export function mountViewer(root: HTMLElement, room: string): void {
         container.classList.add("cursor-hidden");
       }
     }, BAR_HIDE_MS);
-  };
-
-  let osdTimer: number | undefined;
-  const showOsd = (text: string): void => {
-    if (!osdEl) return;
-    osdEl.textContent = text;
-    osdEl.hidden = false;
-    if (osdTimer !== undefined) {
-      window.clearTimeout(osdTimer);
-    }
-    osdTimer = window.setTimeout(() => {
-      osdEl.hidden = true;
-      osdTimer = undefined;
-    }, 1800);
   };
 
   const setStatus = (msg: string, isError = false): void => {
@@ -485,6 +563,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
     pauseOverlay.hidden = true;
     discordStatsModal.hidden = true;
     video.srcObject = null;
+    pingPlayer?.showState("stopped", msg);
     setStatus(msg, isError);
   };
 
@@ -744,6 +823,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
         pauseOverlay.hidden = true;
         if (video.srcObject !== remote) {
           video.srcObject = remote;
+          pingPlayer?.attachStream(remote);
           syncSoundUi();
         }
         const tryPlay = () => {
@@ -886,43 +966,6 @@ export function mountViewer(root: HTMLElement, room: string): void {
     }
   });
 
-  const toggleMute = (): void => {
-    if (video.muted || video.volume === 0) {
-      video.muted = false;
-      if (video.volume === 0) {
-        video.volume = 1;
-        vol.value = "1";
-      }
-      void video.play().catch(() => {
-        video.muted = true;
-        syncSoundUi();
-      });
-    } else {
-      video.muted = true;
-    }
-    syncSoundUi();
-  };
-
-  const toggleFullscreen = (): void => {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => undefined);
-      return;
-    }
-    if (typeof container.requestFullscreen === "function") {
-      void container.requestFullscreen().catch(() => {
-        const webkitVideo = video as HTMLVideoElement & {
-          webkitEnterFullscreen?: () => void;
-        };
-        webkitVideo.webkitEnterFullscreen?.();
-      });
-      return;
-    }
-    const webkitVideo = video as HTMLVideoElement & {
-      webkitEnterFullscreen?: () => void;
-    };
-    webkitVideo.webkitEnterFullscreen?.();
-  };
-
   const isPipSupported = (): boolean => {
     return Boolean(
       (document.pictureInPictureEnabled && typeof video.requestPictureInPicture === "function") ||
@@ -976,20 +1019,6 @@ export function mountViewer(root: HTMLElement, room: string): void {
     showOsd("Janela flutuante fechada");
   });
 
-  const toggleTheater = (): void => {
-    container.classList.toggle("theater-mode");
-    const isTheater = container.classList.contains("theater-mode");
-    theaterBtn.classList.toggle("active", isTheater);
-    showOsd(isTheater ? "🎭 Modo Teatro ativado" : "Modo Teatro normal");
-  };
-
-  const toggleStatsModal = (): void => {
-    discordStatsModal.hidden = !discordStatsModal.hidden;
-    if (!discordStatsModal.hidden) {
-      showOsd("📶 Estatísticas da Transmissão");
-    }
-  };
-
   const onKeyDown = (e: KeyboardEvent): void => {
     if (finished || bar.hidden) return;
     if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -1004,54 +1033,18 @@ export function mountViewer(root: HTMLElement, room: string): void {
       return;
     }
 
-    if (e.key === "m" || e.key === "M") {
-      e.preventDefault();
-      toggleMute();
-      showOsd(video.muted ? "🔇 Silenciado" : "🔊 Som ativado");
-      showBarTemporarily();
-    } else if (e.key === "f" || e.key === "F") {
-      e.preventDefault();
-      toggleFullscreen();
-      showOsd(document.fullscreenElement ? "🔲 Janela normal" : "🔲 Tela cheia");
-      showBarTemporarily();
-    } else if (e.key === "p" || e.key === "P") {
-      e.preventDefault();
-      void togglePip();
-      showBarTemporarily();
-    } else if (e.key === "t" || e.key === "T") {
-      e.preventDefault();
-      toggleTheater();
-      showBarTemporarily();
-    } else if (e.key === "d" || e.key === "D") {
-      e.preventDefault();
-      toggleStatsModal();
-      showBarTemporarily();
-    } else if (e.key === "q" || e.key === "Q") {
-      e.preventDefault();
-      const currentIdx = PRESET_ORDER.indexOf(currentPreset);
-      const nextIdx = (currentIdx + 1) % PRESET_ORDER.length;
-      setQualityPreset(PRESET_ORDER[nextIdx], true);
-      showBarTemporarily();
-    } else if (e.key === "Escape") {
+    if (e.key === "Escape") {
       if (!discordStatsModal.hidden) {
         e.preventDefault();
         discordStatsModal.hidden = true;
         showBarTemporarily();
       }
-    } else if (e.key === " " || e.key === "k" || e.key === "K") {
-      e.preventDefault();
-      toggleMute();
-      showOsd(video.muted ? "🔇 Silenciado" : "🔊 Som ativado");
-      showBarTemporarily();
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       const next = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
       video.volume = next;
       vol.value = String(next);
-      if (video.muted && next > 0) {
-        video.muted = false;
-        void video.play().catch(() => undefined);
-      }
+      video.muted = false;
       syncSoundUi();
       showOsd(`🔊 Volume: ${Math.round(next * 100)}%`);
       showBarTemporarily();
@@ -1122,16 +1115,6 @@ export function mountViewer(root: HTMLElement, room: string): void {
     showBarTemporarily();
   });
 
-  theaterBtn.addEventListener("click", () => {
-    toggleTheater();
-    showBarTemporarily();
-  });
-
-  qualityEl.addEventListener("click", () => {
-    toggleStatsModal();
-    showBarTemporarily();
-  });
-
   closeStatsBtn.addEventListener("click", () => {
     discordStatsModal.hidden = true;
   });
@@ -1146,6 +1129,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
   function onBeforeUnload(): void {
     if (finished) return;
     terminate("Conexão encerrada.", false);
+    pingPlayer?.dispose();
   }
 
   window.addEventListener("beforeunload", onBeforeUnload);

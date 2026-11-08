@@ -6,7 +6,7 @@ const securityHeaders = {
   "Referrer-Policy": "no-referrer",
   "Permissions-Policy": "display-capture=(self)",
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http: ws:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http: ws:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
 };
 
 function localApiRoomsPlugin(): Plugin {

@@ -1,0 +1,248 @@
+/* Ping Player - Video.js Black + Gray Theme */
+
+.video-js {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: var(--bg-stage, #000000);
+  font-family: inherit;
+  color: var(--text, #f4f4f5);
+}
+
+.video-js video {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+}
+
+.video-js .vjs-text-track-display {
+  pointer-events: none !important;
+}
+
+/* Barra de Controles */
+.video-js .vjs-control-bar {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  background: linear-gradient(to top, rgba(9, 9, 11, 0.92) 0%, rgba(9, 9, 11, 0.6) 70%, transparent 100%);
+  backdrop-filter: blur(8px);
+  padding: 0 12px;
+  z-index: 20;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.video-js.vjs-user-inactive.vjs-playing .vjs-control-bar {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Botões da Barra */
+.video-js .vjs-button {
+  cursor: pointer;
+  color: var(--text-2, #a1a1aa);
+  transition: color 0.15s ease, background-color 0.15s ease;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm, 4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 6px;
+  font-size: var(--fs-body, 14px);
+}
+
+.video-js .vjs-button:hover,
+.video-js .vjs-button:focus-visible {
+  color: var(--text, #f4f4f5);
+  background-color: var(--surface-2, #18181b);
+}
+
+.video-js .vjs-button.active {
+  color: var(--primary, #3b82f6);
+}
+
+/* Live Badge */
+.video-js .vjs-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background-color: var(--surface-1, #121214);
+  border: 1px solid var(--border, #27272a);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text, #f4f4f5);
+  margin-right: 8px;
+  user-select: none;
+}
+
+.video-js .vjs-live-badge .pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--success, #22c55e);
+  box-shadow: 0 0 8px var(--success, #22c55e);
+  animation: vjs-pulse 1.8s infinite;
+}
+
+@keyframes vjs-pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+/* Painel de Volume */
+.video-js .vjs-volume-panel {
+  display: flex;
+  align-items: center;
+  margin-right: auto;
+}
+
+.video-js .vjs-volume-control {
+  width: 5em;
+}
+
+/* Menus de Qualidade e FPS */
+.video-js .vjs-menu-button-popup {
+  position: relative;
+}
+
+.video-js .vjs-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  display: none;
+  z-index: 30;
+}
+
+.video-js .vjs-menu-button-popup.vjs-hover .vjs-menu,
+.video-js .vjs-menu-button-popup:focus-within .vjs-menu {
+  display: block;
+}
+
+.video-js .vjs-menu-content {
+  background-color: var(--surface-1, #121214);
+  border: 1px solid var(--border, #27272a);
+  border-radius: var(--r-md, 8px);
+  padding: 4px;
+  min-width: 120px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+  list-style: none;
+  margin: 0;
+}
+
+.video-js .vjs-menu-item {
+  padding: 6px 10px;
+  font-size: var(--fs-body, 13px);
+  color: var(--text-2, #a1a1aa);
+  border-radius: var(--r-sm, 4px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.video-js .vjs-menu-item:hover,
+.video-js .vjs-menu-item:focus {
+  background-color: var(--surface-2, #18181b);
+  color: var(--text, #f4f4f5);
+}
+
+.video-js .vjs-menu-item.vjs-selected {
+  background-color: var(--surface-3, #27272a);
+  color: var(--text, #f4f4f5);
+  font-weight: 600;
+}
+
+.video-js .vjs-menu-item.vjs-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Rótulos dos botões personalizados */
+.video-js .vjs-quality-label,
+.video-js .vjs-fps-label,
+.video-js .vjs-theater-label,
+.video-js .vjs-stats-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* OSD Overlay */
+.vjs-osd-overlay {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(18, 18, 20, 0.88);
+  border: 1px solid var(--border, #27272a);
+  backdrop-filter: blur(10px);
+  border-radius: var(--r-md, 8px);
+  padding: 8px 16px;
+  color: var(--text, #f4f4f5);
+  font-size: var(--fs-body, 13px);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 25;
+  pointer-events: auto;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.vjs-osd-overlay[hidden] {
+  display: none !important;
+}
+
+.vjs-osd-overlay[data-state="paused"] {
+  border-color: var(--warning, #eab308);
+  color: var(--warning, #eab308);
+}
+
+.vjs-osd-overlay[data-state="stopped"] {
+  border-color: var(--danger, #ef4444);
+  color: var(--danger, #ef4444);
+}
+
+.vjs-osd-overlay[data-state="reconnecting"] {
+  border-color: var(--primary, #3b82f6);
+  color: var(--primary, #3b82f6);
+}
+
+.vjs-unmute-prompt {
+  background-color: var(--primary, #3b82f6);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--r-sm, 4px);
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Container Queries e Responsividade */
+@container (max-width: 580px) {
+  .video-js .vjs-fps-control,
+  .video-js .vjs-theater-control {
+    display: none !important;
+  }
+}
+
+@media (max-width: 580px) {
+  .video-js .vjs-fps-control,
+  .video-js .vjs-theater-control {
+    display: none !important;
+  }
+}

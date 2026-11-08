@@ -1,6 +1,6 @@
 /* Aplica tema e paleta antes da primeira pintura (evita flash). Carregado como script síncrono por causa da CSP (sem inline). */
 (function () {
-  var theme = "light";
+  var theme = "dark";
   var palette = "indigo";
   try {
     var t = localStorage.getItem("ping:theme");
@@ -14,4 +14,7 @@
   var root = document.documentElement;
   root.setAttribute("data-theme", theme);
   root.setAttribute("data-palette", palette);
+  try {
+    window.VIDEOJS_NO_DYNAMIC_STYLE = true;
+  } catch (err) {}
 })();
