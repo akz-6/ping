@@ -40,6 +40,38 @@ function localApiRoomsPlugin(): Plugin {
         next();
       });
       server.middlewares.use((req, res, next) => {
+        if (req.url?.startsWith("/api/calls")) {
+          res.setHeader("Content-Type", "application/json");
+          let bodyRaw = "";
+          req.on("data", (chunk: any) => {
+            bodyRaw += chunk;
+          });
+          req.on("end", () => {
+            let body: any = {};
+            try {
+              if (bodyRaw) body = JSON.parse(bodyRaw);
+            } catch {}
+
+            const action = body.action;
+            const appId = (process.env.CF_CALLS_APP_ID || "").trim();
+            const appSecret = (process.env.CF_CALLS_APP_SECRET || "").trim();
+
+            if (action === "health") {
+              res.statusCode = 200;
+              return res.end(JSON.stringify({ ok: Boolean(appId && appSecret) }));
+            }
+
+            if (!appId || !appSecret) {
+              res.statusCode = 503;
+              return res.end(JSON.stringify({ error: "sfu_unavailable" }));
+            }
+
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true }));
+          });
+          return;
+        }
+
         if (req.url?.startsWith("/api/turn")) {
           res.setHeader("Content-Type", "application/json");
           res.statusCode = 200;

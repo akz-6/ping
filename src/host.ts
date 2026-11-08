@@ -33,6 +33,12 @@ import type { Room } from "./app/services/rooms";
 import { ChatHub } from "./chat/chat-hub";
 import { ChatUi } from "./chat/chat-ui";
 import { getProfile } from "./app/identity";
+import {
+  resolveTransportMode,
+  createHostTransport,
+  type HostTransport,
+  type TransportInfo,
+} from "./transport";
 
 const STORAGE_UPLOAD_KEY = "ping_upload_mbps";
 const DEFAULT_UPLOAD_MBPS = 50;
@@ -91,8 +97,9 @@ export function playJoinChime(): void {
 
 interface ViewerEntry {
   conn: DataConnection;
-  call: MediaConnection;
+  call?: MediaConnection;
   pc?: RTCPeerConnection;
+  mode?: "p2p" | "sfu";
   clientId?: string;
   sampler: SenderStatsSampler | null;
   adapter: BitrateAdapter;
@@ -408,6 +415,8 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   const approvedClients = new Set<string>();
   const blockedIds = new Set<string>();
   const failedPasswordAttempts = new Map<string, number>();
+  let hostTransport: HostTransport | null = null;
+  let currentTransportInfo: TransportInfo = { mode: "p2p" };
 
   const clearStartTimeout = (): void => {
     if (startTimeout !== undefined) {
@@ -499,6 +508,45 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     pendingList.replaceChildren(...items);
   };
 
+  const switchToP2P = async (): Promise<void> => {
+    if (!hostTransport || hostTransport.mode !== "sfu") return;
+    await hostTransport.stop().catch(() => {});
+    hostTransport = null;
+    currentTransportInfo = { mode: "p2p" };
+
+    for (const { conn } of viewers.values()) {
+      send(conn, { t: "transport-switch", mode: "p2p" });
+    }
+
+    if (stream && peer) {
+      for (const [peerId, entry] of viewers.entries()) {
+        entry.mode = "p2p";
+        if (!entry.call && entry.conn.open) {
+          const call = peer.call(peerId, stream, {
+            metadata: { room: mountOpts.roomId || "" },
+          });
+          if (call) {
+            entry.call = call;
+            entry.pc = call.peerConnection;
+          }
+        }
+      }
+    }
+  };
+
+  const rekeySfuSession = async (): Promise<void> => {
+    if (!hostTransport || hostTransport.mode !== "sfu" || !stream) return;
+    try {
+      currentTransportInfo = await hostTransport.start(stream);
+      for (const entry of viewers.values()) {
+        send(entry.conn, { t: "approved", transport: currentTransportInfo });
+      }
+    } catch {
+      // Se falhar a republicação no SFU, degrada para P2P
+      void switchToP2P();
+    }
+  };
+
   const kickViewer = (peerId: string): void => {
     const entry = viewers.get(peerId);
     if (!entry) return;
@@ -506,6 +554,9 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     approvedClients.delete(peerId);
     send(entry.conn, { t: "kicked" });
     dropViewer(peerId);
+    if (hostTransport && hostTransport.mode === "sfu") {
+      void rekeySfuSession();
+    }
   };
 
   const blockViewer = (peerId: string): void => {
@@ -519,6 +570,9 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     if (entry) {
       send(entry.conn, { t: "denied", reason: "blocked" });
       dropViewer(peerId);
+    }
+    if (hostTransport && hostTransport.mode === "sfu") {
+      void rekeySfuSession();
     }
   };
 
@@ -750,6 +804,12 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       } catch {}
     }
 
+    if (hostTransport) {
+      void hostTransport.stop().catch(() => {});
+      hostTransport = null;
+    }
+    currentTransportInfo = { mode: "p2p" };
+
     hostLifecycle?.stop();
     hostLifecycle = null;
     clearStartTimeout();
@@ -855,6 +915,10 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     setContentHint(newVideoTrack, opts.hint);
     newVideoTrack.addEventListener("ended", stopLive);
 
+    if (hostTransport && hostTransport.mode === "sfu") {
+      await hostTransport.replaceStream(captured);
+    }
+
     const codecOrder = CODEC_PRESETS[opts.codecPreset] ?? CODEC_PRESETS.vp9;
     for (const entry of viewers.values()) {
       if (entry.pc) {
@@ -924,6 +988,26 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     const codecOrder = CODEC_PRESETS[opts.codecPreset] ?? CODEC_PRESETS.vp9;
 
     const applyViewerQuality = (entry: ViewerEntry): void => {
+      if (hostTransport && hostTransport.mode === "sfu") {
+        const allFps = [...viewers.values()]
+          .map((v) => v.customFps)
+          .filter((f): f is number => typeof f === "number");
+        const highestFps = allFps.length > 0 ? Math.max(...allFps) : opts.fps;
+        let minScale = 1;
+        for (const v of viewers.values()) {
+          if (v.qualityPreset === "source") { minScale = 1; break; }
+          if (v.qualityPreset === "720p" && minScale > 1) minScale = 1;
+          if (v.qualityPreset === "480p" && minScale > 1.5) minScale = 1.5;
+          if (v.qualityPreset === "360p" && minScale > 2) minScale = 2;
+        }
+        void hostTransport.applyEncoding({
+          maxBitrate: opts.bitrateKbps * 1000,
+          maxFramerate: highestFps,
+          scaleDown: minScale,
+        });
+        return;
+      }
+
       if (!entry.pc) return;
       const { kbps, fps, scaleDown } = getPresetParameters(
         entry.qualityPreset,
@@ -981,9 +1065,32 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       stop();
     }, CONNECT_TIMEOUT_MS);
 
-    p.on("open", (openedId) => {
+    p.on("open", async (openedId) => {
       if (peer !== p) return;
       clearStartTimeout();
+
+      // Inicializa SFU se configurado/disponível com fallback silencioso para P2P
+      try {
+        const mode = await resolveTransportMode();
+        if (mode === "sfu" && stream) {
+          const sfuTransport = createHostTransport({
+            mode: "sfu",
+            iceServers,
+            onDegrade: (_reason) => {
+              void switchToP2P();
+            },
+          });
+          currentTransportInfo = await sfuTransport.start(stream);
+          hostTransport = sfuTransport;
+        } else {
+          currentTransportInfo = { mode: "p2p" };
+          hostTransport = null;
+        }
+      } catch {
+        currentTransportInfo = { mode: "p2p" };
+        hostTransport = null;
+      }
+
       linkInput.value = `${location.origin}${location.pathname}?room=${openedId}`;
       setup.hidden = true;
       live.hidden = false;
@@ -1127,6 +1234,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       let welcomed = false;
       let processingAuth = false;
       let authDelayTimer: number | undefined;
+      let setupP2pFn: (() => void) | null = null;
 
       const clearAuthDelay = (): void => {
         if (authDelayTimer !== undefined) {
@@ -1185,23 +1293,44 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           return;
         }
 
-        const call = p.call(conn.peer, stream, {
-          metadata: { room: id },
-          sdpTransform: (sdp: string) =>
-            preferVideoCodecsInSdp(sdp, codecOrder),
-        });
-        if (!call) {
-          conn.close();
-          return;
-        }
-
+        const isSfu = Boolean(hostTransport && hostTransport.mode === "sfu");
+        let call: MediaConnection | undefined;
+        let pc: RTCPeerConnection | undefined;
         const adapter = new BitrateAdapter(opts.bitrateKbps, {
           mode: opts.bitrateMode,
         });
-        const pc = call.peerConnection as RTCPeerConnection | undefined;
-        if (pc) {
-          applyCodecPreferences(pc, codecOrder);
-        }
+
+        const setupP2p = () => {
+          if (!stream || peer !== p || !conn.open) return;
+          call = p.call(conn.peer, stream, {
+            metadata: { room: id },
+            sdpTransform: (sdp: string) =>
+              preferVideoCodecsInSdp(sdp, codecOrder),
+          });
+          if (!call) return;
+          pc = call.peerConnection as RTCPeerConnection | undefined;
+          if (pc) {
+            applyCodecPreferences(pc, codecOrder);
+            pc.addEventListener("iceconnectionstatechange", onIceStateChange);
+            pc.addEventListener("connectionstatechange", onConnStateChange);
+          }
+          call.on("close", onCallClose);
+          call.on("error", onCallError);
+          const existing = viewers.get(conn.peer);
+          if (existing) {
+            existing.call = call;
+            existing.pc = pc;
+            existing.mode = "p2p";
+            existing.sampler = pc
+              ? new SenderStatsSampler(
+                  pc,
+                  () => call?.peerConnection?.getSenders()?.find((s) => s.track?.kind === "video"),
+                  () => currentVideoTrack,
+                )
+              : null;
+            apply();
+          }
+        };
 
         const apply = (): void => {
           if (!pc) return;
@@ -1219,7 +1348,6 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
             void capVideoSender(pc, kbps, fps, opts.hint, scaleDown).catch(() => undefined);
           }
         };
-        apply();
 
         let iceRecoveryTimer: number | undefined;
         const clearIceTimer = (): void => {
@@ -1267,9 +1395,10 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
               iceRecoveryTimer = window.setTimeout(() => {
                 iceRecoveryTimer = undefined;
                 if (
-                  pc.iceConnectionState === "disconnected" ||
-                  pc.iceConnectionState === "failed" ||
-                  pc.iceConnectionState === "closed"
+                  pc &&
+                  (pc.iceConnectionState === "disconnected" ||
+                    pc.iceConnectionState === "failed" ||
+                    pc.iceConnectionState === "closed")
                 ) {
                   dropViewer(conn.peer, conn);
                 }
@@ -1280,7 +1409,6 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
             dropViewer(conn.peer, conn);
           }
         };
-        pc?.addEventListener("iceconnectionstatechange", onIceStateChange);
 
         const onConnStateChange = (): void => {
           if (!pc) return;
@@ -1291,12 +1419,14 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
             dropViewer(conn.peer, conn);
           }
         };
-        pc?.addEventListener("connectionstatechange", onConnStateChange);
 
         const onCallClose = (): void => dropViewer(conn.peer, conn);
         const onCallError = (): void => dropViewer(conn.peer, conn);
-        call.on("close", onCallClose);
-        call.on("error", onCallError);
+
+        setupP2pFn = setupP2p;
+        if (!isSfu) {
+          setupP2p();
+        }
 
         const cleanup = (): void => {
           if (cleaned) return;
@@ -1305,16 +1435,18 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           clearIceTimer();
           pc?.removeEventListener("iceconnectionstatechange", onIceStateChange);
           pc?.removeEventListener("connectionstatechange", onConnStateChange);
-          call.off("close", onCallClose);
-          call.off("error", onCallError);
+          if (call) {
+            call.off("close", onCallClose);
+            call.off("error", onCallError);
+            try {
+              call.close();
+            } catch {
+              // Ignora erro ao fechar chamada
+            }
+          }
           conn.off("data", onData);
           conn.off("close", onConnClose);
           conn.off("error", onConnError);
-          try {
-            call.close();
-          } catch {
-            // Ignora erro ao fechar chamada
-          }
           try {
             if (conn.open) conn.close({ flush: true });
             else conn.close();
@@ -1330,12 +1462,13 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           conn,
           call,
           pc,
+          mode: isSfu ? "sfu" : "p2p",
           clientId,
           sampler: pc
             ? new SenderStatsSampler(
                 pc,
                 () =>
-                  call.peerConnection
+                  call?.peerConnection
                     ?.getSenders()
                     ?.find((s) => s.track?.kind === "video"),
                 () => currentVideoTrack,
@@ -1360,7 +1493,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         applyViewerQuality(entry);
         playJoinChime();
         toast("Um novo espectador entrou na transmissão! 🔔");
-        send(conn, { t: "approved" });
+        send(conn, { t: "approved", transport: currentTransportInfo });
         send(conn, { t: "welcome", maxFps: opts.fps });
         broadcastCount();
       };
@@ -1408,6 +1541,13 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         }
 
         if (msg.t === "transport-fallback") {
+          const targetEntry = viewers.get(conn.peer);
+          if (targetEntry) {
+            targetEntry.mode = "p2p";
+            if (!targetEntry.call && stream && peer === p) {
+              setupP2pFn?.();
+            }
+          }
           return;
         }
 
@@ -1546,6 +1686,10 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       }
       currentVideoTrack = newVideoTrack;
       newVideoTrack.addEventListener("ended", stop);
+
+      if (hostTransport && hostTransport.mode === "sfu") {
+        await hostTransport.replaceStream(newStream);
+      }
 
       for (const entry of viewers.values()) {
         if (entry.pc) {

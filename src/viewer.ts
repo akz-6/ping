@@ -23,6 +23,10 @@ import { $, copyText, shortId } from "./ui";
 import { PingPlayer } from "./player/ping-player";
 import { ChatUi } from "./chat/chat-ui";
 import { getDiscordTicket, getProfile } from "./app/identity";
+import {
+  createViewerTransport,
+  type ViewerTransport,
+} from "./transport";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BACKOFF_MS = [1000, 2000, 3000, 5000, 8000];
@@ -188,6 +192,8 @@ export function mountViewer(root: HTMLElement, room: string): void {
   let hostMaxFps = 60;
   let currentFpsChoice: string = "auto";
   let osdTimer: number | undefined;
+  let activeViewerTransport: ViewerTransport | null = null;
+  let currentTransportMode: "p2p" | "sfu" = "p2p";
 
   let pingPlayer: PingPlayer;
 
@@ -207,7 +213,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const toggleStatsModal = (): void => {
     discordStatsModal.hidden = !discordStatsModal.hidden;
     if (!discordStatsModal.hidden) {
-      showOsd("📶 Estatísticas da Transmissão");
+      showOsd(`📶 Estatísticas (${currentTransportMode.toUpperCase()})`);
     }
   };
 
@@ -508,6 +514,10 @@ export function mountViewer(root: HTMLElement, room: string): void {
 
   const cleanupCurrentAttempt = (): void => {
     clearTimers();
+    if (activeViewerTransport) {
+      activeViewerTransport.close();
+      activeViewerTransport = null;
+    }
     if (detachCallListeners) {
       detachCallListeners();
       detachCallListeners = null;
@@ -568,6 +578,10 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const terminate = (msg: string, isError = true): void => {
     if (finished) return;
     finished = true;
+    if (activeViewerTransport) {
+      activeViewerTransport.close();
+      activeViewerTransport = null;
+    }
     if (backoffTimer !== undefined) {
       window.clearTimeout(backoffTimer);
       backoffTimer = undefined;
@@ -745,6 +759,33 @@ export function mountViewer(root: HTMLElement, room: string): void {
           case "approved":
           case "welcome": {
             authWrap.hidden = true;
+            if (msg.t === "approved" && msg.transport?.mode === "sfu") {
+              currentTransportMode = "sfu";
+              if (activeViewerTransport) {
+                activeViewerTransport.close();
+                activeViewerTransport = null;
+              }
+              const sfuTransport = createViewerTransport({
+                mode: "sfu",
+                iceServers,
+                onFail: (_reason) => {
+                  if (conn && conn.open) {
+                    conn.send({ t: "transport-fallback", reason: "sfu_failed" } satisfies ToHost);
+                  }
+                },
+              });
+              activeViewerTransport = sfuTransport;
+              sfuTransport
+                .connect(msg.transport)
+                .then((remote) => {
+                  handleStreamReceived(remote);
+                })
+                .catch(() => {
+                  if (conn && conn.open) {
+                    conn.send({ t: "transport-fallback", reason: "sfu_connect_error" } satisfies ToHost);
+                  }
+                });
+            }
             if (msg.t === "welcome" && typeof msg.maxFps === "number") {
               updateFpsSelectorOptions(msg.maxFps);
             }
@@ -762,6 +803,16 @@ export function mountViewer(root: HTMLElement, room: string): void {
                 scheduleReconnect("ice");
               }, CONNECT_TIMEOUT_MS);
             }
+            break;
+          }
+
+          case "transport-switch": {
+            if (activeViewerTransport) {
+              activeViewerTransport.close();
+              activeViewerTransport = null;
+            }
+            currentTransportMode = "p2p";
+            showOsd("Mudando para conexão P2P…");
             break;
           }
 
@@ -824,6 +875,40 @@ export function mountViewer(root: HTMLElement, room: string): void {
       });
     });
 
+    const handleStreamReceived = (remote: MediaStream): void => {
+      if (peer !== p || finished) return;
+      pauseOverlay.hidden = true;
+      if (video.srcObject !== remote) {
+        video.srcObject = remote;
+        pingPlayer?.attachStream(remote);
+        syncSoundUi();
+      }
+      const tryPlay = () => {
+        void video.play().catch(() => {
+          video.muted = true;
+          syncSoundUi();
+          void video.play().catch(() => undefined);
+        });
+      };
+      tryPlay();
+      video.onloadedmetadata = tryPlay;
+      gotStream = true;
+      everConnected = true;
+      reconnectAttempt = 0;
+      if (attemptTimeout !== undefined) {
+        window.clearTimeout(attemptTimeout);
+        attemptTimeout = undefined;
+      }
+      if (iceDisconnectTimer !== undefined) {
+        window.clearTimeout(iceDisconnectTimer);
+        iceDisconnectTimer = undefined;
+      }
+      statusEl.hidden = true;
+      bar.hidden = false;
+      liveBadge.hidden = false;
+      showBarTemporarily();
+    };
+
     p.on("call", (call) => {
       if (peer !== p || finished) {
         call.close();
@@ -883,36 +968,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
 
       call.on("stream", (remote) => {
         if (peer !== p || finished) return;
-        pauseOverlay.hidden = true;
-        if (video.srcObject !== remote) {
-          video.srcObject = remote;
-          pingPlayer?.attachStream(remote);
-          syncSoundUi();
-        }
-        const tryPlay = () => {
-          void video.play().catch(() => {
-            video.muted = true;
-            syncSoundUi();
-            void video.play().catch(() => undefined);
-          });
-        };
-        tryPlay();
-        video.onloadedmetadata = tryPlay;
-        gotStream = true;
-        everConnected = true;
-        reconnectAttempt = 0;
-        if (attemptTimeout !== undefined) {
-          window.clearTimeout(attemptTimeout);
-          attemptTimeout = undefined;
-        }
-        if (iceDisconnectTimer !== undefined) {
-          window.clearTimeout(iceDisconnectTimer);
-          iceDisconnectTimer = undefined;
-        }
-        statusEl.hidden = true;
-        bar.hidden = false;
-        liveBadge.hidden = false;
-        showBarTemporarily();
+        handleStreamReceived(remote);
 
         if (statsTimer === undefined) {
           const sampler = new StatsSampler(call.peerConnection);
