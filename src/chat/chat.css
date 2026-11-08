@@ -79,16 +79,97 @@
 
 /* Botão de abrir o chat quando recolhido, com contador de não lidas */
 .chat-toggle { position: relative; }
-.chat-toggle__badge,
-.chat-unread-badge {
+.chat-toggle__badge {
   position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px;
   display: none; align-items: center; justify-content: center;
   border-radius: var(--radius-full); background: var(--danger); color: var(--text);
   font-size: var(--fs-xs); font-weight: 700;
 }
-.chat-toggle__badge[data-visible="true"],
-.chat-unread-badge[data-visible="true"] { display: inline-flex; }
+.chat-toggle__badge[data-visible="true"] { display: inline-flex; }
+
+.chat-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: var(--danger);
+  color: var(--text);
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+.chat-unread-badge[hidden] {
+  display: none !important;
+}
+
+/* Grid do Palco (Viewer e Host) */
+.palco-layout,
+.ping-stage {
+  display: grid;
+  grid-template-columns: 1fr var(--chat-width);
+  width: 100vw;
+  height: 100vh;
+  min-height: calc(100vh - var(--header-h));
+  overflow: hidden;
+  background: var(--bg-stage);
+}
+
+.palco-layout.chat-hidden,
+.ping-stage[data-chat="hidden"] {
+  grid-template-columns: 1fr;
+}
+
+.palco-layout.chat-hidden .chat-panel,
+.ping-stage[data-chat="hidden"] .chat-panel {
+  display: none !important;
+}
+
+.palco-stage,
+.ping-stage__player {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-stage);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Modo Teatro: chat sobrepõe à direita ou fica ao lado */
+.viewer.theater-mode .palco-layout,
+.ping-stage[data-theater="true"] {
+  grid-template-columns: 1fr var(--chat-width);
+}
+
+.viewer.theater-mode .palco-layout.chat-hidden,
+.ping-stage[data-theater="true"][data-chat="hidden"] {
+  grid-template-columns: 1fr;
+}
 
 @media (max-width: 900px) {
-  .chat-panel { border-left: 0; border-top: 1px solid var(--border); min-height: 320px; max-height: 50vh; }
+  .palco-layout,
+  .ping-stage {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  .palco-stage,
+  .ping-stage__player {
+    flex: 1;
+    min-height: 240px;
+  }
+  .chat-panel {
+    width: 100%;
+    height: 40vh;
+    max-height: 320px;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
 }
+

@@ -1,3 +1,4 @@
+import { renderAvatar } from "../app/avatar";
 import { DISCORD_AVATAR_RE } from "../protocol";
 import type { ChatMsg } from "./types";
 
@@ -14,6 +15,9 @@ export class ChatUi {
   private inputEl: HTMLInputElement;
   private sendBtn: HTMLButtonElement;
   private closeBtn: HTMLButtonElement;
+  private counterEl: HTMLElement;
+  private noticeEl: HTMLElement;
+  private moreBtn: HTMLButtonElement;
   private unreadCount = 0;
   private isOpen = true;
 
@@ -28,12 +32,12 @@ export class ChatUi {
 
     // Header
     const header = document.createElement("div");
-    header.className = "chat-header";
+    header.className = "chat-header chat-panel__head";
 
     const titleWrap = document.createElement("div");
     titleWrap.className = "chat-title-wrap";
     const title = document.createElement("h2");
-    title.className = "chat-title";
+    title.className = "chat-title chat-panel__title";
     title.textContent = "Chat ao Vivo";
     titleWrap.appendChild(title);
 
@@ -55,18 +59,38 @@ export class ChatUi {
 
     // Messages list
     this.messagesEl = document.createElement("div");
-    this.messagesEl.className = "chat-messages";
+    this.messagesEl.className = "chat-messages chat-list";
     this.messagesEl.setAttribute("role", "log");
     this.messagesEl.setAttribute("aria-live", "polite");
+    this.messagesEl.addEventListener("scroll", () => {
+      if (this.isNearBottom()) {
+        this.moreBtn.dataset.visible = "false";
+      }
+    });
     this.panelEl.appendChild(this.messagesEl);
+
+    // Botão "Novas mensagens"
+    this.moreBtn = document.createElement("button");
+    this.moreBtn.type = "button";
+    this.moreBtn.className = "chat-more";
+    this.moreBtn.textContent = "Novas mensagens ↓";
+    this.moreBtn.dataset.visible = "false";
+    this.moreBtn.addEventListener("click", () => {
+      this.scrollToBottom();
+      this.moreBtn.dataset.visible = "false";
+    });
+    this.panelEl.appendChild(this.moreBtn);
 
     // Input form
     const form = document.createElement("form");
-    form.className = "chat-input-wrap";
+    form.className = "chat-input-wrap chat-form";
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       this.submitMessage();
     });
+
+    const row = document.createElement("div");
+    row.className = "chat-form__row";
 
     this.inputEl = document.createElement("input");
     this.inputEl.type = "text";
@@ -75,6 +99,12 @@ export class ChatUi {
     this.inputEl.setAttribute("aria-label", "Escreva uma mensagem no chat");
     this.inputEl.maxLength = 300;
     this.inputEl.autocomplete = "off";
+
+    this.inputEl.addEventListener("input", () => {
+      const len = this.inputEl.value.length;
+      this.counterEl.textContent = `${len}/300`;
+      this.counterEl.dataset.level = len >= 280 ? "warn" : "normal";
+    });
 
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -88,8 +118,21 @@ export class ChatUi {
     this.sendBtn.className = "chat-send-btn";
     this.sendBtn.textContent = "Enviar";
 
-    form.appendChild(this.inputEl);
-    form.appendChild(this.sendBtn);
+    row.appendChild(this.inputEl);
+    row.appendChild(this.sendBtn);
+    form.appendChild(row);
+
+    const foot = document.createElement("div");
+    foot.className = "chat-form__foot";
+    this.noticeEl = document.createElement("span");
+    this.noticeEl.className = "chat-notice";
+    this.counterEl = document.createElement("span");
+    this.counterEl.className = "chat-counter";
+    this.counterEl.textContent = "0/300";
+    foot.appendChild(this.noticeEl);
+    foot.appendChild(this.counterEl);
+    form.appendChild(foot);
+
     this.panelEl.appendChild(form);
   }
 
@@ -139,19 +182,19 @@ export class ChatUi {
       this.options.onUnreadChange?.(this.unreadCount);
     } else if (wasNearBottom) {
       this.scrollToBottom();
+    } else {
+      this.moreBtn.dataset.visible = "true";
     }
   }
 
   public showNotice(text: string, isError = false): void {
-    const notice = document.createElement("div");
-    notice.className = `chat-notice ${isError ? "is-error" : ""}`;
-    notice.textContent = text;
-    this.messagesEl.appendChild(notice);
-    this.scrollToBottom();
-
+    this.noticeEl.textContent = text;
+    this.noticeEl.classList.toggle("is-error", isError);
     window.setTimeout(() => {
-      notice.remove();
-    }, 5000);
+      if (this.noticeEl.textContent === text) {
+        this.noticeEl.textContent = "";
+      }
+    }, 4000);
   }
 
   private isNearBottom(): boolean {
@@ -172,13 +215,15 @@ export class ChatUi {
     if (!val || val.length > 300) return;
 
     this.inputEl.value = "";
+    this.counterEl.textContent = "0/300";
+    this.counterEl.dataset.level = "normal";
     this.options.onSendMessage(val);
   }
 
   private renderMessage(msg: ChatMsg): void {
     if (msg.kind === "system") {
       const sysEl = document.createElement("div");
-      sysEl.className = "chat-msg-system";
+      sysEl.className = "chat-msg-system chat-msg--system";
       sysEl.textContent = msg.text;
       this.messagesEl.appendChild(sysEl);
       return;
@@ -188,68 +233,53 @@ export class ChatUi {
     row.className = "chat-msg";
     row.dataset.id = msg.id;
 
-    // Avatar
+    // Avatar seguro
     if (msg.avatar && DISCORD_AVATAR_RE.test(msg.avatar)) {
-      const img = document.createElement("img");
-      img.className = "chat-avatar";
-      img.src = msg.avatar;
-      img.alt = msg.name;
-      img.addEventListener("error", () => {
-        img.replaceWith(this.createMonogram(msg.name));
-      });
-      row.appendChild(img);
+      row.appendChild(renderAvatar({ name: msg.name, url: msg.avatar, size: "sm" }));
     } else {
-      row.appendChild(this.createMonogram(msg.name));
+      row.appendChild(renderAvatar({ name: msg.name, size: "sm" }));
     }
 
     // Content container
     const content = document.createElement("div");
-    content.className = "chat-msg-content";
+    content.className = "chat-msg-content chat-msg__body";
 
     // Meta line
     const meta = document.createElement("div");
-    meta.className = "chat-msg-meta";
+    meta.className = "chat-msg-meta chat-msg__meta";
 
     const author = document.createElement("span");
-    author.className = "chat-msg-author";
+    author.className = "chat-msg-author chat-msg__name";
     author.textContent = msg.name;
     meta.appendChild(author);
 
     if (msg.badge === "host") {
       const badge = document.createElement("span");
-      badge.className = "chat-badge chat-badge-host";
+      badge.className = "chat-badge chat-badge-host chip chip--host";
       badge.textContent = "HOST";
       meta.appendChild(badge);
     } else if (msg.badge === "discord") {
       const badge = document.createElement("span");
-      badge.className = "chat-badge chat-badge-discord";
+      badge.className = "chat-badge chat-badge-discord chip chip--verified";
       badge.textContent = "@discord";
       meta.appendChild(badge);
     }
 
-    const time = document.createElement("span");
-    time.className = "chat-msg-time";
+    const time = document.createElement("time");
+    time.className = "chat-msg-time chat-msg__time";
     time.textContent = this.formatTime(msg.ts);
     meta.appendChild(time);
 
     content.appendChild(meta);
 
     // Text content (strictly textContent, zero innerHTML)
-    const text = document.createElement("div");
-    text.className = "chat-msg-text";
+    const text = document.createElement("p");
+    text.className = "chat-msg-text chat-msg__text";
     text.textContent = msg.text;
     content.appendChild(text);
 
     row.appendChild(content);
     this.messagesEl.appendChild(row);
-  }
-
-  private createMonogram(name: string): HTMLElement {
-    const mono = document.createElement("div");
-    mono.className = "chat-msg-monogram";
-    const initial = (name.trim()[0] || "?").toUpperCase();
-    mono.textContent = initial;
-    return mono;
   }
 
   private formatTime(ts: number): string {

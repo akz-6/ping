@@ -53,6 +53,11 @@
 .video-js.ping-skin .vjs-big-play-button .vjs-icon-placeholder::before { line-height: 84px; }
 
 /* Barra de controle */
+.video-js .vjs-control-bar[hidden],
+.video-js.ping-skin .vjs-control-bar[hidden],
+#bar[hidden] {
+  display: none !important;
+}
 .video-js .vjs-control-bar,
 .video-js.ping-skin .vjs-control-bar {
   display: flex !important;
