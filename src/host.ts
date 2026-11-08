@@ -625,12 +625,13 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   const chatMount = $<HTMLElement>(root, "#host-chat-mount");
   const hostPalco = $<HTMLElement>(root, "#host-palco");
 
+  const myProfile = getProfile();
   const chatHub = new ChatHub({
     hostUser: {
       peerId: "host",
-      name: getProfile().displayName || "Anfitrião",
+      name: myProfile.displayName || "Anfitrião",
       badge: "host",
-      avatar: null,
+      avatar: myProfile.avatarUrl || null,
     },
     onBroadcast: (msg) => {
       for (const { conn } of viewers.values()) {
@@ -1051,16 +1052,60 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       if (live.hidden) stop();
     });
 
+    interface VerifiedDiscordUser {
+      discordId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+    }
+    const verifiedDiscordCache = new Map<string, VerifiedDiscordUser>();
+
+    async function verifyDiscordTicket(peerId: string, ticket: string): Promise<VerifiedDiscordUser | null> {
+      const cached = verifiedDiscordCache.get(peerId);
+      if (cached) return cached;
+      try {
+        const res = await fetch("/api/discord-auth?action=verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket, peerId }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as VerifiedDiscordUser;
+          if (data && data.discordId) {
+            verifiedDiscordCache.set(peerId, data);
+            return data;
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return null;
+    }
+
     p.on("connection", (conn) => {
       if (peer !== p || !stream) {
         conn.close();
         return;
       }
 
-      const { clientId, name: metaName } = parseConnectionMetadata(conn.metadata);
-      const viewerName =
+      const { clientId, name: metaName, ticket: metaTicket } = parseConnectionMetadata(conn.metadata);
+      let viewerTicket: string | undefined = metaTicket;
+      let effectiveViewerName =
         metaName ||
         "Espectador " + (clientId ? clientId.slice(0, 4) : conn.peer.slice(0, 4));
+      let effectiveBadge: "discord" | null = null;
+      let effectiveAvatar: string | null = null;
+
+      if (viewerTicket) {
+        void verifyDiscordTicket(conn.peer, viewerTicket).then((verified) => {
+          if (verified) {
+            effectiveViewerName = verified.displayName || effectiveViewerName;
+            effectiveBadge = "discord";
+            effectiveAvatar = verified.avatarUrl;
+          }
+        });
+      }
+
       const rateLimitKey = clientId ?? conn.peer;
 
       if (
@@ -1096,10 +1141,19 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         dropViewer(conn.peer, conn);
       };
 
-      const admitViewer = (): void => {
+      const admitViewer = async (): Promise<void> => {
         if (peer !== p || !stream || welcomed) return;
         welcomed = true;
         dropPending(conn.peer, conn);
+
+        if (viewerTicket && !effectiveBadge) {
+          const verified = await verifyDiscordTicket(conn.peer, viewerTicket);
+          if (verified) {
+            effectiveViewerName = verified.displayName || effectiveViewerName;
+            effectiveBadge = "discord";
+            effectiveAvatar = verified.avatarUrl;
+          }
+        }
 
         if (clientId) {
           approvedClients.add(clientId);
@@ -1262,7 +1316,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           } catch {
             // Ignora erro ao fechar conexão de dados
           }
-          chatHub.postSystemMessage(`${viewerName} saiu da sala`);
+          chatHub.postSystemMessage(`${effectiveViewerName} saiu da sala`);
           chatHub.unregisterViewer(conn.peer);
         };
 
@@ -1292,12 +1346,12 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         viewers.set(conn.peer, entry);
         chatHub.registerViewer({
           peerId: conn.peer,
-          name: viewerName,
-          badge: null,
-          avatar: null,
+          name: effectiveViewerName,
+          badge: effectiveBadge,
+          avatar: effectiveAvatar,
         });
         chatHub.sendHistory(conn.peer);
-        chatHub.postSystemMessage(`${viewerName} entrou na sala`);
+        chatHub.postSystemMessage(`${effectiveViewerName} entrou na sala`);
         applyViewerQuality(entry);
         playJoinChime();
         toast("Um novo espectador entrou na transmissão! 🔔");
@@ -1310,6 +1364,17 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         if (peer !== p || !stream || processingAuth) return;
         const msg = parseToHost(data);
         if (!msg) return;
+
+        if (msg.t === "hello" && msg.ticket && !effectiveBadge) {
+          viewerTicket = msg.ticket;
+          void verifyDiscordTicket(conn.peer, msg.ticket).then((verified) => {
+            if (verified) {
+              effectiveViewerName = verified.displayName || effectiveViewerName;
+              effectiveBadge = "discord";
+              effectiveAvatar = verified.avatarUrl;
+            }
+          });
+        }
 
         if (msg.t === "chat-send") {
           chatHub.handleViewerSend(conn.peer, msg.text);

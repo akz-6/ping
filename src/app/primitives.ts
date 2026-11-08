@@ -1,4 +1,5 @@
-﻿import { h, icon } from "./dom";
+import { h, icon } from "./dom";
+import { DISCORD_AVATAR_RE } from "../protocol";
 
 /* ---------- Button ---------- */
 export type ButtonVariant = "primary" | "secondary" | "discord";
@@ -33,12 +34,36 @@ export function setLoading(btn: HTMLButtonElement, loading: boolean): void {
 }
 
 /* ---------- Avatar ---------- */
-export function Avatar(name: string, size: 36 | 40 | 72 = 40): HTMLElement {
+export function Avatar(
+  name: string,
+  size: 36 | 40 | 72 = 40,
+  avatarUrl?: string | null,
+): HTMLElement {
   const initial = (name.trim().charAt(0) || "?").toUpperCase();
   const clean = name.trim();
   const hash = clean.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const colorIdx = hash % 6;
-  return h("span", { class: `avatar avatar-${size} avatar-c${colorIdx}`, "aria-hidden": "true" }, initial);
+  const fallback = h(
+    "span",
+    { class: `avatar avatar-${size} avatar-c${colorIdx}`, "aria-hidden": "true" },
+    initial,
+  );
+
+  if (avatarUrl && DISCORD_AVATAR_RE.test(avatarUrl)) {
+    const img = h("img", {
+      class: `avatar avatar-${size} avatar-img`,
+      src: avatarUrl,
+      alt: `Avatar de ${name}`,
+    }) as HTMLImageElement;
+
+    img.addEventListener("error", () => {
+      img.replaceWith(fallback);
+    });
+
+    return img;
+  }
+
+  return fallback;
 }
 
 /* ---------- Badge ---------- */

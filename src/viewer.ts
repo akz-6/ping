@@ -22,7 +22,7 @@ import {
 import { $, copyText, shortId } from "./ui";
 import { PingPlayer } from "./player/ping-player";
 import { ChatUi } from "./chat/chat-ui";
-import { getProfile } from "./app/identity";
+import { getDiscordTicket, getProfile } from "./app/identity";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BACKOFF_MS = [1000, 2000, 3000, 5000, 8000];
@@ -649,7 +649,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
       scheduleReconnect(reason);
     }, CONNECT_TIMEOUT_MS);
 
-    p.on("open", () => {
+    p.on("open", async () => {
       if (peer !== p || finished) return;
       setStatus(
         reconnectAttempt > 0
@@ -658,10 +658,18 @@ export function mountViewer(root: HTMLElement, room: string): void {
       );
 
       const myProfile = getProfile();
+      let ticket: string | undefined;
+      if (myProfile.discordLinked) {
+        const fetched = await getDiscordTicket(p.id);
+        if (fetched) ticket = fetched;
+      }
+
+      if (peer !== p || finished) return;
+
       const c = p.connect(room, {
         reliable: true,
         serialization: "json",
-        metadata: { clientId, name: myProfile.displayName },
+        metadata: { clientId, name: myProfile.displayName, ticket },
       });
       conn = c;
 
@@ -680,9 +688,11 @@ export function mountViewer(root: HTMLElement, room: string): void {
       c.on("open", () => {
         if (peer !== p || finished) return;
         everConnected = true;
-        const helloMsg: ToHost = savedPwHash
-          ? { t: "hello", pwHash: savedPwHash }
-          : { t: "hello" };
+        const helloMsg: ToHost = {
+          t: "hello",
+          ...(savedPwHash ? { pwHash: savedPwHash } : {}),
+          ...(ticket ? { ticket } : {}),
+        };
         void c.send(helloMsg);
         if (currentPreset !== "source") {
           void c.send({ t: "quality-preset", preset: currentPreset } satisfies ToHost);

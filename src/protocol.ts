@@ -304,9 +304,13 @@ export function parseToViewer(data: unknown): ToViewer | null {
 }
 
 /** Valida metadados opcionais do DataConnection. */
-export function parseConnectionMetadata(meta: unknown): { clientId?: string; name?: string } {
+export function parseConnectionMetadata(meta: unknown): {
+  clientId?: string;
+  name?: string;
+  ticket?: string;
+} {
   if (!isPlainObject(meta)) return {};
-  const out: { clientId?: string; name?: string } = {};
+  const out: { clientId?: string; name?: string; ticket?: string } = {};
   if (typeof meta.clientId === "string" && CLIENT_ID_RE.test(meta.clientId)) {
     out.clientId = meta.clientId;
   }
@@ -317,6 +321,13 @@ export function parseConnectionMetadata(meta: unknown): { clientId?: string; nam
     !CONTROL_CHARS_RE.test(meta.name)
   ) {
     out.name = meta.name.trim();
+  }
+  if (
+    typeof meta.ticket === "string" &&
+    meta.ticket.length >= 10 &&
+    meta.ticket.length <= 1024
+  ) {
+    out.ticket = meta.ticket;
   }
   return out;
 }

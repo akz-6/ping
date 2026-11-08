@@ -1,4 +1,11 @@
 import { put, list } from "@vercel/blob";
+import {
+  getSessionSecret,
+  verifyPayload,
+  parseCookies,
+  isOwnerDiscord,
+  type SessionData,
+} from "./_lib/session";
 
 export interface StoredRoom {
   id: string;
@@ -143,7 +150,17 @@ export default async function handler(req: any, res: any) {
       const rooms = await getStoredRooms();
       const openCount = rooms.filter((r) => !r.isPrivate && !r.hidden).length;
 
-      const isOwner = body.isOwner || ((body as any).creatorKey && (body as any).creatorKey === OWNER_KEY);
+      const cookies = parseCookies(req.headers?.cookie);
+      const sessionToken = cookies.ping_session;
+      const session = sessionToken
+        ? verifyPayload<SessionData>(sessionToken, getSessionSecret())
+        : null;
+      const isDiscordOwner = Boolean(session && isOwnerDiscord(session.discordId));
+
+      const isOwner =
+        body.isOwner ||
+        isDiscordOwner ||
+        ((body as any).creatorKey && (body as any).creatorKey === OWNER_KEY);
 
       // Limite de 2 salas abertas no catálogo global (exceto se criado pelo dono com master key)
       if (!body.isPrivate && !body.hidden && !isOwner && openCount >= 2) {

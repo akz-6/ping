@@ -1,6 +1,7 @@
 import { Banner } from "./components";
 import { append, discordIcon, h } from "./dom";
 import {
+  checkDiscordConfigured,
   getProfile,
   linkDiscordAccount,
   resetIdentity,
@@ -249,8 +250,34 @@ function radioGroup<T extends string>(
 export function openDiscordConnectModal(opts: {
   onConnected?: (p: UserProfile) => void;
 }): void {
+  const oauthBtn = Button("Entrar com Discord (OAuth2)", {
+    variant: "discord",
+    id: "discord-oauth-btn",
+    block: true,
+    onClick: () => {
+      window.location.href = "/api/discord-auth?action=login";
+    },
+  });
+
+  const oauthNotice = h("p", {
+    class: "field-hint form-error",
+    id: "discord-oauth-notice",
+    hidden: true,
+  });
+
+  void checkDiscordConfigured().then((configured) => {
+    if (!configured) {
+      oauthBtn.disabled = true;
+      oauthBtn.setAttribute("aria-disabled", "true");
+      oauthBtn.title = "Discord OAuth2 não configurado no servidor.";
+      oauthNotice.hidden = false;
+      oauthNotice.textContent =
+        "Discord OAuth não configurado no servidor. O botão acima está desabilitado.";
+    }
+  });
+
   const usernameField = Field({
-    label: "Seu usuário no Discord",
+    label: "Ou informe manualmente seu usuário (não verificado)",
     placeholder: "Ex: usuario",
     maxLength: 32,
   });
@@ -270,7 +297,16 @@ export function openDiscordConnectModal(opts: {
   });
 
   const actions = h("div", { class: "dialog-actions" }, cancelBtn, confirmBtn);
-  const form = h("form", { class: "dialog-form" }, usernameField.el, infoText, actions);
+  const form = h(
+    "form",
+    { class: "dialog-form" },
+    oauthBtn,
+    oauthNotice,
+    h("div", { class: "dialog-separator" }),
+    usernameField.el,
+    infoText,
+    actions,
+  );
 
   const dlg = openDialog({
     title: "Conectar com Discord",
@@ -330,7 +366,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
   const save = Button("Salvar", { variant: "primary" });
   const resetBtn = Button("Redefinir dados", { variant: "secondary" });
 
-  const avatarWrap = h("div", { class: "profile-avatar-wrap" }, Avatar(profile.displayName, 72));
+  const avatarWrap = h("div", { class: "profile-avatar-wrap" }, Avatar(profile.displayName, 72, profile.avatarUrl));
   const handleLabel = h("p", { class: "profile-handle" }, profile.displayName);
   const badgeLabel = h("span", { class: "profile-badge" }, "");
 
@@ -338,7 +374,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     const val = nick.input.value.trim();
     const typed = val || profile.displayName || profile.handle;
     handleLabel.textContent = typed;
-    avatarWrap.replaceChildren(Avatar(typed, 72));
+    avatarWrap.replaceChildren(Avatar(typed, 72, profile.avatarUrl));
     badgeLabel.textContent = profile.discordLinked
       ? `Discord: @${profile.discordUsername || "conectado"}`
       : !val || val === profile.handle
@@ -380,6 +416,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
         },
       });
 
+      const isVerified = Boolean(profile.discordId);
       const box = h(
         "div",
         { class: "discord-linked-box" },
@@ -391,7 +428,7 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
             "div",
             { class: "discord-linked-text" },
             h("span", { class: "discord-linked-tag" }, `@${profile.discordUsername || "Discord"}`),
-            h("span", { class: "discord-badge-pill" }, "Conectado"),
+            h("span", { class: "discord-badge-pill" }, isVerified ? "Verificado" : "Conectado"),
           ),
         ),
         unlinkBtn,

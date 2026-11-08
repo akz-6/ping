@@ -13,7 +13,7 @@ import {
   type NavId,
 } from "./components";
 import { h, normalize } from "./dom";
-import { getHandle, getProfile } from "./identity";
+import { getHandle, getProfile, syncDiscordSession } from "./identity";
 import { openCreateRoomModal, openPasswordModal, openProfileModal } from "./modals";
 import { isCreatorAuthorized, openTestingNoticeModal, checkUrlForCreatorKey } from "./auth-gate";
 import { MAX_OPEN_ROOMS, createRoomService, type Room } from "./services/rooms";
@@ -95,7 +95,8 @@ export function mountApp(root: HTMLElement): void {
 
   const onCreate = async (): Promise<void> => {
     await checkUrlForCreatorKey();
-    const isOwner = isCreatorAuthorized();
+    const profile = getProfile();
+    const isOwner = isCreatorAuthorized() || Boolean(profile.isOwner);
     const currentOpen = openCount();
 
     if (currentOpen >= MAX_OPEN_ROOMS && !isOwner) {
@@ -282,6 +283,24 @@ export function mountApp(root: HTMLElement): void {
   root.replaceChildren(h("div", { class: "app" }, sidebar.el, main, adsRight, bottom));
   setActive("rooms");
   void load();
+
+  const searchParams = new URLSearchParams(location.search);
+  const loginParam = searchParams.get("login");
+  if (loginParam) {
+    const cleanUrl = new URL(location.href);
+    cleanUrl.searchParams.delete("login");
+    cleanUrl.searchParams.delete("reason");
+    history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search);
+    if (loginParam === "ok") {
+      void syncDiscordSession().then((p) => {
+        toast(`Conectado ao Discord com sucesso! (@${p.discordUsername || "user"})`);
+      });
+    } else {
+      toast("Falha na autenticação com o Discord.", "error");
+    }
+  } else {
+    void syncDiscordSession();
+  }
 
   const isHostParam = new URLSearchParams(location.search).get("host") === "1";
   if (!isHostParam && getConsentStatus() === "prompt") {

@@ -14,11 +14,19 @@ const NAV_ITEMS: { id: NavId; label: string; icon: string }[] = [
 export interface SidebarApi {
   el: HTMLElement;
   setActive(id: NavId): void;
-  updateProfile(p: { displayName: string; handle: string; discordLinked?: boolean; discordUsername?: string }): void;
+  updateProfile(p: {
+    displayName: string;
+    handle: string;
+    discordLinked?: boolean;
+    discordUsername?: string;
+    avatarUrl?: string;
+  }): void;
 }
 
 export function SidebarNav(opts: {
   handle: string;
+  displayName?: string;
+  avatarUrl?: string;
   onNavigate: (id: NavId) => void;
 }): SidebarApi {
   const items = NAV_ITEMS.map((it) =>
@@ -37,15 +45,16 @@ export function SidebarNav(opts: {
     ),
   );
 
-  const avatarWrap = h("span", { class: "profile-avatar-wrap" }, Avatar(opts.handle, 36));
-  const nameEl = h("span", { class: "profile-name" }, opts.handle);
+  const initialName = opts.displayName || opts.handle;
+  const avatarWrap = h("span", { class: "profile-avatar-wrap" }, Avatar(initialName, 36, opts.avatarUrl));
+  const nameEl = h("span", { class: "profile-name" }, initialName);
   const badgeEl = h("span", { class: "profile-badge" }, "Anônimo");
   const profileBtn = h(
     "button",
     {
       type: "button",
       class: "profile-card",
-      "aria-label": `Abrir perfil de ${opts.handle}`,
+      "aria-label": `Abrir perfil de ${initialName}`,
       onClick: () => opts.onNavigate("profile"),
     },
     avatarWrap,
@@ -77,9 +86,15 @@ export function SidebarNav(opts: {
     profileBtn,
   );
 
-  const updateProfile = (p: { displayName: string; handle: string; discordLinked?: boolean; discordUsername?: string }) => {
+  const updateProfile = (p: {
+    displayName: string;
+    handle: string;
+    discordLinked?: boolean;
+    discordUsername?: string;
+    avatarUrl?: string;
+  }) => {
     profileBtn.setAttribute("aria-label", `Abrir perfil de ${p.displayName}`);
-    avatarWrap.replaceChildren(Avatar(p.displayName, 36));
+    avatarWrap.replaceChildren(Avatar(p.displayName, 36, p.avatarUrl));
     nameEl.textContent = p.displayName;
     badgeEl.textContent = p.discordLinked
       ? (p.discordUsername ? `@${p.discordUsername}` : "Discord")
@@ -87,7 +102,13 @@ export function SidebarNav(opts: {
   };
 
   window.addEventListener("ping:profile-updated", (e: Event) => {
-    const custom = e as CustomEvent<{ displayName: string; handle: string; discordLinked?: boolean; discordUsername?: string }>;
+    const custom = e as CustomEvent<{
+      displayName: string;
+      handle: string;
+      discordLinked?: boolean;
+      discordUsername?: string;
+      avatarUrl?: string;
+    }>;
     if (custom.detail) updateProfile(custom.detail);
   });
 
@@ -154,7 +175,7 @@ export function RoomCard(room: Room, onSelect: (room: Room) => void): HTMLElemen
         onSelect(room);
       },
     },
-    Avatar(room.host, 40),
+    Avatar(room.host, 40, (room as any).hostAvatarUrl),
     h(
       "span",
       { class: "room-text" },
