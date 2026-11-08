@@ -802,3 +802,74 @@ body {
 .screen-share-tip strong {
   color: var(--text);
 }
+/* Ping v2: Studio do anfitrião (/studio). Só tokens, sem estilos inline, sem anúncios. */
+
+.studio {
+  display: grid; min-height: 100vh;
+  grid-template-columns: minmax(0, 1fr) var(--chat-w);
+  grid-template-rows: var(--header-h) minmax(0, 1fr);
+  grid-template-areas: "bar bar" "main side";
+  background: var(--bg);
+}
+.studio[data-chat="hidden"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "bar" "main"; }
+.studio[data-chat="hidden"] .studio__side { display: none; }
+
+.studio__bar {
+  grid-area: bar; display: flex; align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-5); border-bottom: 1px solid var(--border); background: var(--bg);
+}
+.studio__room { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.studio__room-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio__spacer { flex: 1; }
+
+.studio__main { grid-area: main; min-width: 0; padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-5); }
+.studio__side { grid-area: side; min-height: 0; display: flex; }
+.studio__side .chat-panel { flex: 1; }
+
+/* Prévia da transmissão */
+.preview {
+  position: relative; width: 100%; max-height: 62vh; aspect-ratio: 16 / 9;
+  background: var(--bg-stage); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden;
+}
+.preview video { width: 100%; height: 100%; object-fit: contain; display: block; background: var(--bg-stage); }
+.preview__empty { position: absolute; inset: 0; display: grid; place-content: center; gap: var(--space-3); justify-items: center; text-align: center; color: var(--text-muted); padding: var(--space-6); }
+.preview__empty strong { color: var(--text); font-size: var(--fs-lg); }
+.preview__state { position: absolute; top: var(--space-3); left: var(--space-3); display: flex; gap: var(--space-2); }
+
+/* Barra de controle da live */
+.controls { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.controls__group { display: flex; gap: var(--space-2); }
+.controls__sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 var(--space-1); }
+.btn[aria-pressed="true"] { background: var(--surface-3); border-color: var(--border-strong); }
+.btn--end { margin-left: auto; }
+
+/* Link fixo da sala */
+.share { display: flex; gap: var(--space-2); align-items: center; padding: var(--space-3); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.share__url { flex: 1; min-width: 0; font: 400 var(--fs-sm) var(--font-mono); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Painéis de configuração */
+.panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.panel__head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); }
+.panel__title { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+.panel__body { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.studio-grid { display: grid; gap: var(--space-5); grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+/* Espectadores conectados */
+.viewers { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.viewers th { text-align: left; font-weight: 500; color: var(--text-muted); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
+.viewers td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); vertical-align: middle; }
+.viewers tr:last-child td { border-bottom: 0; }
+.viewers__who { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.viewers__stat { font-family: var(--font-mono); color: var(--text-2); white-space: nowrap; }
+.viewers__stat[data-level="warn"] { color: var(--danger); }
+.viewers__actions { display: flex; gap: var(--space-1); justify-content: flex-end; }
+.pending-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.pending-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--surface-2); border-radius: var(--radius-md); }
+
+@media (max-width: 900px) {
+  .studio, .studio[data-chat="hidden"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "bar" "main" "side"; grid-template-rows: var(--header-h) auto auto; }
+  .studio__side .chat-panel { max-height: 50vh; }
+  .studio__main { padding: var(--space-4); }
+  .btn--end { margin-left: 0; }
+  .viewers th:nth-child(n+3), .viewers td:nth-child(n+3):not(:last-child) { display: none; }
+}

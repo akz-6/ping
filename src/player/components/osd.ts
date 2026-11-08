@@ -13,7 +13,7 @@ export class PingOsd extends Component {
 
   createEl() {
     const el = videojs.dom.createEl("div", {
-      className: "vjs-osd-overlay ping-osd ping-overlay",
+      className: "vjs-osd-overlay ping-osd",
       id: "osd",
     }) as HTMLElement;
     el.setAttribute("role", "status");
