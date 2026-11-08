@@ -1,0 +1,3 @@
+# Ping ads.txt
+# Para ativar o Google AdSense, configure a variável de ambiente VITE_ADSENSE_CLIENT_ID (ex.: ca-pub-XXXXXXXXXXXXXXXX)
+# Formato: google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0

@@ -1,12 +1,16 @@
 import { defineConfig, type Plugin } from "vite";
 
+const strictCsp =
+  "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: blob: https://cdn.discordapp.com; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http: ws:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
+const lobbyCsp =
+  "default-src 'self'; script-src 'self' https://pagead2.googlesyndication.com https://*.google.com https://*.doubleclick.net; style-src 'self'; font-src 'self' data:; img-src 'self' data: blob: https://cdn.discordapp.com https://*.google.com https://*.doubleclick.net; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http: ws: https://pagead2.googlesyndication.com https://*.google.com https://*.doubleclick.net; frame-src 'self' https://googleads.g.doubleclick.net https://*.google.com https://*.doubleclick.net; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
 const securityHeaders = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
   "Permissions-Policy": "display-capture=(self)",
-  "Content-Security-Policy":
-    "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data: blob: https://cdn.discordapp.com; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http: ws:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
 };
 
 function localApiRoomsPlugin(): Plugin {
@@ -14,6 +18,27 @@ function localApiRoomsPlugin(): Plugin {
   return {
     name: "local-api-rooms",
     configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url) {
+          const parsed = new URL(req.url, "http://localhost");
+          const isLobby = parsed.pathname === "/" && !parsed.searchParams.has("room");
+          const chosenCsp = isLobby ? lobbyCsp : strictCsp;
+
+          res.setHeader("Content-Security-Policy", chosenCsp);
+          const origSetHeader = res.setHeader.bind(res);
+          res.setHeader = function (name: string, value: any) {
+            if (name.toLowerCase() === "content-security-policy") {
+              return origSetHeader("Content-Security-Policy", chosenCsp);
+            }
+            return origSetHeader(name, value);
+          };
+
+          if (parsed.pathname === "/studio") {
+            req.url = "/index.html" + parsed.search;
+          }
+        }
+        next();
+      });
       server.middlewares.use((req, res, next) => {
         if (req.url?.startsWith("/api/turn")) {
           res.setHeader("Content-Type", "application/json");
@@ -148,6 +173,29 @@ function localApiRoomsPlugin(): Plugin {
           res.statusCode = 200;
           return res.end(JSON.stringify({ ok: true }));
         });
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url) {
+          const parsed = new URL(req.url, "http://localhost");
+          const isLobby = parsed.pathname === "/" && !parsed.searchParams.has("room");
+          const chosenCsp = isLobby ? lobbyCsp : strictCsp;
+
+          res.setHeader("Content-Security-Policy", chosenCsp);
+          const origSetHeader = res.setHeader.bind(res);
+          res.setHeader = function (name: string, value: any) {
+            if (name.toLowerCase() === "content-security-policy") {
+              return origSetHeader("Content-Security-Policy", chosenCsp);
+            }
+            return origSetHeader(name, value);
+          };
+
+          if (parsed.pathname === "/studio") {
+            req.url = "/index.html" + parsed.search;
+          }
+        }
+        next();
       });
     },
   };

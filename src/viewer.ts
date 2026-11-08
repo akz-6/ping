@@ -1163,14 +1163,12 @@ export function mountViewer(root: HTMLElement, room: string): void {
       samples: diagnosticBuffer.getAll(),
     };
     (window as any).__pingLastDiag = diagData;
-    const ok = await copyText(JSON.stringify(diagData, null, 2));
-    if (ok) {
-      const prev = copyDiagBtn.textContent;
-      copyDiagBtn.textContent = "Copiado!";
-      window.setTimeout(() => {
-        copyDiagBtn.textContent = prev;
-      }, 2000);
-    }
+    void copyText(JSON.stringify(diagData, null, 2));
+    const prev = copyDiagBtn.textContent;
+    copyDiagBtn.textContent = "Copiado!";
+    window.setTimeout(() => {
+      copyDiagBtn.textContent = prev;
+    }, 2000);
   });
 
   pipBtn.addEventListener("click", () => {

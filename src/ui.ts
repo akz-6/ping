@@ -1,4 +1,4 @@
-﻿export function $<T extends HTMLElement>(root: ParentNode, selector: string): T {
+export function $<T extends HTMLElement>(root: ParentNode, selector: string): T {
   const el = root.querySelector<T>(selector);
   if (!el) throw new Error(`Elemento não encontrado: ${selector}`);
   return el;
@@ -15,21 +15,12 @@ export function toast(message: string, kind: "info" | "error" = "info"): void {
 }
 
 export async function copyText(text: string): Promise<boolean> {
-  if (
-    navigator.clipboard &&
-    typeof navigator.clipboard.writeText === "function" &&
-    document.hasFocus()
-  ) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
     try {
-      const ok = await Promise.race([
-        navigator.clipboard.writeText(text).then(() => true),
-        new Promise<boolean>((_, reject) =>
-          window.setTimeout(() => reject(new Error("timeout")), 800),
-        ),
-      ]);
-      return ok;
+      await navigator.clipboard.writeText(text);
+      return true;
     } catch {
-      // Fallback para textarea caso permissão ou foco falhe
+      // Fallback
     }
   }
 

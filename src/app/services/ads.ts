@@ -1,4 +1,4 @@
-﻿import { h, icon } from "../dom";
+import { h, icon } from "../dom";
 
 export type AdSize = "300x250" | "300x600" | "320x100";
 export type ConsentStatus = "accepted" | "essential" | "prompt";
@@ -253,6 +253,105 @@ export class DirectSponsorAdProvider implements AdProvider {
   }
 }
 
+export class GoogleAdSenseProvider implements AdProvider {
+  private fallbackProvider: AdProvider;
+  private clientId: string;
+  private scriptInjected = false;
+  private scriptFailed = false;
+
+  constructor(clientId?: string, fallbackProvider?: AdProvider) {
+    const raw = clientId ?? (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_ADSENSE_CLIENT_ID);
+    this.clientId = typeof raw === "string" ? raw.trim() : "";
+    this.fallbackProvider = fallbackProvider ?? new DirectSponsorAdProvider();
+  }
+
+  setClientId(clientId: string): void {
+    this.clientId = clientId.trim();
+  }
+
+  setFallback(fallback: AdProvider): void {
+    this.fallbackProvider = fallback;
+  }
+
+  private ensureScript(): void {
+    if (this.scriptInjected || typeof document === "undefined" || !this.clientId) return;
+    if (!hasAdConsent()) return;
+
+    const clientParam = this.clientId.startsWith("pub-")
+      ? `ca-${this.clientId}`
+      : this.clientId;
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src*="pagead2.googlesyndication.com"]`,
+    );
+    if (existing) {
+      this.scriptInjected = true;
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(clientParam)}`;
+    script.addEventListener("error", () => {
+      this.scriptFailed = true;
+      window.dispatchEvent(new CustomEvent("ping:consent-changed", { detail: { status: "fallback" } }));
+    });
+    document.head.append(script);
+    this.scriptInjected = true;
+  }
+
+  render(container: HTMLElement, size: AdSize): void {
+    // Regra estrita da Fase 7: NUNCA renderizar anúncios no /studio nem no /?room=
+    if (typeof window !== "undefined") {
+      const isStudio = window.location.pathname.startsWith("/studio");
+      const isRoom = new URLSearchParams(window.location.search).has("room");
+      if (isStudio || isRoom) {
+        container.replaceChildren();
+        return;
+      }
+    }
+
+    // Se o usuário não consentiu com anúncios, delega ao comportamento de optout do fallback
+    if (!hasAdConsent()) {
+      this.fallbackProvider.render(container, size);
+      return;
+    }
+
+    // Se não há Client ID configurado ou o script falhou (adblocker/rede), usa o fallback DirectSponsor
+    if (!this.clientId || this.scriptFailed) {
+      this.fallbackProvider.render(container, size);
+      return;
+    }
+
+    this.ensureScript();
+
+    container.replaceChildren();
+    container.classList.remove("is-optout");
+    container.classList.add("has-adsense");
+
+    const clientParam = this.clientId.startsWith("pub-")
+      ? `ca-${this.clientId}`
+      : this.clientId;
+
+    const ins = h("ins", {
+      class: `adsbygoogle adsbygoogle-${size}`,
+      "data-ad-client": clientParam,
+      "data-ad-format": "auto",
+      "data-full-width-responsive": "true",
+      "aria-label": `Anúncio Google ${size}`,
+    });
+
+    container.append(ins);
+
+    try {
+      ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+    } catch {
+      this.fallbackProvider.render(container, size);
+    }
+  }
+}
+
 export class PlaceholderAdProvider implements AdProvider {
   render(container: HTMLElement, size: AdSize): void {
     container.replaceChildren(
@@ -266,7 +365,12 @@ export class PlaceholderAdProvider implements AdProvider {
   }
 }
 
-let activeProvider: AdProvider = new DirectSponsorAdProvider();
+const defaultClientId =
+  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_ADSENSE_CLIENT_ID) || "";
+
+let activeProvider: AdProvider = defaultClientId
+  ? new GoogleAdSenseProvider(defaultClientId)
+  : new DirectSponsorAdProvider();
 
 export function setAdProvider(provider: AdProvider): void {
   activeProvider = provider;
@@ -319,6 +423,17 @@ export function AdSlot(size: AdSize): HTMLElement {
   const loadContent = () => {
     if (loaded) return;
     loaded = true;
+
+    // Regra estrita da Fase 7: NUNCA renderizar anúncios no /studio nem no /?room=
+    if (typeof window !== "undefined") {
+      const isStudio = window.location.pathname.startsWith("/studio");
+      const isRoom = new URLSearchParams(window.location.search).has("room");
+      if (isStudio || isRoom) {
+        slot.replaceChildren();
+        return;
+      }
+    }
+
     activeProvider.render(slot, size);
   };
 

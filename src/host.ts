@@ -767,24 +767,29 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       dropPending(id);
     }
     for (const { conn } of viewers.values()) send(conn, { t: "ended" });
-    for (const id of [...viewers.keys()]) dropViewer(id, undefined, true);
-    approvedClients.clear();
-    blockedIds.clear();
-    requestedPresets.clear();
-    requestedFps.clear();
-    failedPasswordAttempts.clear();
-    countEl.textContent = "0 espectadores";
-    updateCapacityUi();
-    renderPendingList();
-    renderStatsTable();
+    const currentViewers = [...viewers.keys()];
+    const oldPeer = peer;
+    peer = null;
+
+    setTimeout(() => {
+      for (const id of currentViewers) dropViewer(id, undefined, true);
+      approvedClients.clear();
+      blockedIds.clear();
+      requestedPresets.clear();
+      requestedFps.clear();
+      failedPasswordAttempts.clear();
+      countEl.textContent = "0 espectadores";
+      updateCapacityUi();
+      renderPendingList();
+      renderStatsTable();
+      if (oldPeer) {
+        oldPeer.removeAllListeners();
+        oldPeer.destroy();
+      }
+    }, 60);
+
     stream?.getTracks().forEach((t) => t.stop());
     stream = null;
-    if (peer) {
-      const oldPeer = peer;
-      peer = null;
-      oldPeer.removeAllListeners();
-      oldPeer.destroy();
-    }
     isStreamPaused = false;
     isAudioMuted = false;
     isLiveActive = true;

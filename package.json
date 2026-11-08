@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/gen-ads-txt.mjs",
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/gen-ads-txt.mjs && tsc --noEmit && vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test"
   },

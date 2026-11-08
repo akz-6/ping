@@ -21,7 +21,7 @@ import { getConsentStatus, openConsentBanner } from "./services/ads";
 
 type Status = "loading" | "ready" | "error";
 
-export function mountApp(root: HTMLElement): void {
+export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | "host" }): void {
   const service = createRoomService();
   const handle = getProfile().displayName || getHandle();
 
@@ -65,8 +65,12 @@ export function mountApp(root: HTMLElement): void {
         stopBtn.click();
       }
       view = "lobby";
+      if (location.pathname.startsWith("/studio")) {
+        history.pushState({ view: "lobby" }, "", "/" + (location.search ? location.search : ""));
+      }
       hostView.hidden = true;
       lobby.hidden = false;
+      adsRight.hidden = false;
       setActive("rooms");
       void load();
       return;
@@ -77,6 +81,9 @@ export function mountApp(root: HTMLElement): void {
 
   const showHost = async (password?: string, roomId?: string, hostToken?: string): Promise<void> => {
     view = "host";
+    if (location.pathname !== "/studio") {
+      history.pushState({ view: "host" }, "", "/studio" + (location.search ? location.search : ""));
+    }
     lobby.hidden = true;
     hostView.hidden = false;
     hostView.replaceChildren();
@@ -187,7 +194,7 @@ export function mountApp(root: HTMLElement): void {
       for (const room of list) {
         items.append(RoomCard(room, onSelect));
         opts.counter.n += 1;
-        if (opts.counter.n % 4 === 0) {
+        if (opts.counter.n === 6) {
           items.append(h("div", { class: "ad-inline" }, AdSlot("320x100")));
         }
       }
@@ -258,6 +265,25 @@ export function mountApp(root: HTMLElement): void {
     if (status === "ready") render();
   });
 
+  const lobbyFooter = h(
+    "footer",
+    { class: "lobby-footer", role: "contentinfo" },
+    h(
+      "div",
+      { class: "lobby-footer-links" },
+      h("a", { href: "/privacy.html", class: "lobby-footer-link" }, "Privacidade"),
+      h("span", { class: "lobby-footer-sep", "aria-hidden": "true" }, "•"),
+      h("a", { href: "/terms.html", class: "lobby-footer-link" }, "Termos"),
+      h("span", { class: "lobby-footer-sep", "aria-hidden": "true" }, "•"),
+      h("a", { href: "/contact.html", class: "lobby-footer-link" }, "Contato"),
+    ),
+    h(
+      "p",
+      { class: "lobby-footer-copy" },
+      "Ping © 2026 — Transmissão WebRTC peer-to-peer de alta performance.",
+    ),
+  );
+
   lobby.append(
     h(
       "div",
@@ -268,6 +294,7 @@ export function mountApp(root: HTMLElement): void {
     search,
     live,
     feed,
+    lobbyFooter,
   );
 
   const main = h("main", { class: "main", id: "main" }, lobby, hostView);
@@ -302,20 +329,30 @@ export function mountApp(root: HTMLElement): void {
     void syncDiscordSession();
   }
 
+  window.addEventListener("popstate", () => {
+    if (location.pathname.startsWith("/studio") && view !== "host") {
+      void showHost("");
+    } else if (!location.pathname.startsWith("/studio") && view === "host") {
+      showLobby();
+    }
+  });
+
+  const isStudioRoute = location.pathname.startsWith("/studio") || options?.initialView === "host";
   const isHostParam = new URLSearchParams(location.search).get("host") === "1";
-  if (!isHostParam && getConsentStatus() === "prompt") {
+
+  if (!isHostParam && !isStudioRoute && getConsentStatus() === "prompt") {
     openConsentBanner();
   }
 
-  if (new URLSearchParams(location.search).get("host") === "1") {
+  if (isStudioRoute || isHostParam) {
     void checkUrlForCreatorKey().then(() => {
       if (isCreatorAuthorized()) {
-        showHost("");
+        void showHost("");
       } else {
         openTestingNoticeModal({
           onAuthorized: () => {
             toast("Máquina autorizada com sucesso!");
-            showHost("");
+            void showHost("");
           },
         });
       }
