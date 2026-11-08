@@ -17,12 +17,8 @@ import {
   type PasswordResult,
 } from "./services/rooms";
 import {
-  PALETTES,
-  getPalette,
   getThemeChoice,
-  setPalette,
   setThemeChoice,
-  type Palette,
   type ThemeChoice,
 } from "../theme";
 import { toast } from "../ui";
@@ -255,7 +251,7 @@ export function openDiscordConnectModal(opts: {
 }): void {
   const usernameField = Field({
     label: "Seu usuário no Discord",
-    placeholder: "Ex: usuario ou usuario#0000",
+    placeholder: "Ex: usuario",
     maxLength: 32,
   });
   usernameField.input.id = "discord-username-input";
@@ -442,13 +438,6 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     getThemeChoice(),
     setThemeChoice,
   );
-  const palette = radioGroup<Palette>(
-    "Paleta",
-    "palette",
-    PALETTES.map((p) => ({ value: p.id, label: p.label, swatch: p.id })),
-    getPalette(),
-    setPalette,
-  );
 
   const privacyBox = h("div", { class: "profile-privacy-box" });
   const consentSt = getConsentStatus();
@@ -500,7 +489,6 @@ export function openProfileModal(opts: { handle: string; onSaved?: (p: UserProfi
     discordSlot,
     note,
     appearance,
-    palette,
     privacyBox,
     pwaBtn,
     h("div", { class: "dialog-actions" }, resetBtn, close, save),

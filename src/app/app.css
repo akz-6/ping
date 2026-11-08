@@ -147,7 +147,7 @@ html.scroll-lock { overflow: hidden; }
 .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
 .btn-secondary { background: var(--card); color: var(--text-1); border-color: var(--border); }
 .btn-secondary:hover:not(:disabled) { border-color: var(--border-hover); background: var(--bg); }
-.btn-discord { background: var(--discord); color: #fff; }
+.btn-discord { background: var(--discord); color: var(--text); }
 .btn-discord:hover:not(:disabled) { filter: brightness(1.08); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -168,20 +168,20 @@ html.scroll-lock { overflow: hidden; }
   display: inline-grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--primary);
-  color: var(--on-primary);
+  background: var(--surface-3);
+  color: var(--text);
   font-weight: 600;
   box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--border);
 }
 .avatar-36 { width: 36px; height: 36px; font-size: var(--fs-body); }
 .avatar-40 { width: 40px; height: 40px; font-size: var(--fs-h2); }
 .avatar-72 { width: 72px; height: 72px; font-size: var(--fs-display); }
-.avatar.avatar-c0 { background: #4338ca; color: #ffffff; }
-.avatar.avatar-c1 { background: #0f766e; color: #ffffff; }
-.avatar.avatar-c2 { background: #6d28d9; color: #ffffff; }
-.avatar.avatar-c3 { background: #be123c; color: #ffffff; }
-.avatar.avatar-c4 { background: #b45309; color: #ffffff; }
-.avatar.avatar-c5 { background: #0369a1; color: #ffffff; }
+.avatar.avatar-c0 { background: var(--avatar-c0-bg); color: var(--avatar-c0-fg); }
+.avatar.avatar-c1 { background: var(--avatar-c1-bg); color: var(--avatar-c1-fg); }
+.avatar.avatar-c2 { background: var(--avatar-c2-bg); color: var(--avatar-c2-fg); }
+.avatar.avatar-c3 { background: var(--avatar-c3-bg); color: var(--avatar-c3-fg); }
+.avatar.avatar-c4 { background: var(--avatar-c4-bg); color: var(--avatar-c4-fg); }
+.avatar.avatar-c5 { background: var(--avatar-c5-bg); color: var(--avatar-c5-fg); }
 
 .badge {
   flex: none;
@@ -764,7 +764,7 @@ html.scroll-lock { overflow: hidden; }
   align-items: center;
   gap: 4px;
   background: rgba(88, 101, 242, 0.15);
-  color: #5865F2;
+  color: var(--discord);
   font-size: var(--fs-caption);
   font-weight: 600;
   padding: 2px 8px;

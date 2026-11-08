@@ -170,19 +170,21 @@ test.describe("lobby", () => {
     await expect(page.locator(".profile-name")).toHaveText("MestrePing");
   });
 
-  test("tema e paleta mudam sem recarregar, persistem e não piscam", async ({ page }) => {
+  test("tema muda sem recarregar, persiste e não pisca", async ({ page }) => {
     const html = page.locator("html");
     await page.locator(".profile-card").click();
     await page.getByText("Escuro", { exact: true }).click();
-    await page.getByText("Terracota", { exact: true }).click();
     await expect(html).toHaveAttribute("data-theme", "dark");
-    await expect(html).toHaveAttribute("data-palette", "terracota");
-    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    expect(bg).toBe("rgb(28, 23, 19)");
+    const bgDark = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    expect(bgDark).toBe("rgb(9, 9, 11)");
+
+    await page.getByText("Claro", { exact: true }).click();
+    await expect(html).toHaveAttribute("data-theme", "light");
+    const bgLight = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    expect(bgLight).toBe("rgb(250, 250, 250)");
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(html).toHaveAttribute("data-theme", "dark");
-    await expect(html).toHaveAttribute("data-palette", "terracota");
+    await expect(html).toHaveAttribute("data-theme", "light");
   });
 
   test("não há rolagem horizontal no desktop", async ({ page }) => {

@@ -1,14 +1,6 @@
-﻿export type ThemeChoice = "light" | "dark" | "system";
-export type Palette = "indigo" | "teal" | "terracota";
-
-export const PALETTES: { id: Palette; label: string; swatch: string }[] = [
-  { id: "indigo", label: "Indigo", swatch: "#4f46e5" },
-  { id: "teal", label: "Teal", swatch: "#0f766e" },
-  { id: "terracota", label: "Terracota", swatch: "#c2410c" },
-];
+export type ThemeChoice = "dark" | "light" | "system";
 
 const THEME_KEY = "ping:theme";
-const PALETTE_KEY = "ping:palette";
 
 const media = (): MediaQueryList | null =>
   typeof window.matchMedia === "function"
@@ -28,18 +20,13 @@ function write(key: string, value: string | null): void {
     if (value === null) localStorage.removeItem(key);
     else localStorage.setItem(key, value);
   } catch {
-    // Armazenamento indisponível: a escolha vale só na sessão.
+    // Armazenamento indisponível
   }
 }
 
 export function getThemeChoice(): ThemeChoice {
   const v = read(THEME_KEY);
-  return v === "light" || v === "dark" ? v : "system";
-}
-
-export function getPalette(): Palette {
-  const v = read(PALETTE_KEY);
-  return v === "teal" || v === "terracota" ? v : "indigo";
+  return v === "light" || v === "dark" ? v : "dark"; // dark é o padrão
 }
 
 function resolved(choice: ThemeChoice): "light" | "dark" {
@@ -47,26 +34,23 @@ function resolved(choice: ThemeChoice): "light" | "dark" {
   return choice;
 }
 
-function apply(choice: ThemeChoice, palette: Palette): void {
+export function applyTheme(choice: ThemeChoice): void {
   const root = document.documentElement;
-  root.setAttribute("data-theme", resolved(choice));
-  root.setAttribute("data-palette", palette);
+  const res = resolved(choice);
+  root.dataset.theme = res;
+  root.setAttribute("data-theme", res);
+  root.removeAttribute("data-palette");
 }
 
 export function setThemeChoice(choice: ThemeChoice): void {
   write(THEME_KEY, choice === "system" ? null : choice);
-  apply(choice, getPalette());
-}
-
-export function setPalette(palette: Palette): void {
-  write(PALETTE_KEY, palette);
-  apply(getThemeChoice(), palette);
+  applyTheme(choice);
 }
 
 /** Reaplica ao carregar e acompanha a preferência do sistema enquanto o usuário não escolheu. */
 export function initTheme(): void {
-  apply(getThemeChoice(), getPalette());
+  applyTheme(getThemeChoice());
   media()?.addEventListener?.("change", () => {
-    if (getThemeChoice() === "system") apply("system", getPalette());
+    if (getThemeChoice() === "system") applyTheme("system");
   });
 }
