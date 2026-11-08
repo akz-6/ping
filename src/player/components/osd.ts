@@ -13,12 +13,13 @@ export class PingOsd extends Component {
 
   createEl() {
     const el = videojs.dom.createEl("div", {
-      className: "vjs-osd-overlay",
+      className: "vjs-osd-overlay ping-osd ping-overlay",
       id: "osd",
-    });
+    }) as HTMLElement;
     el.setAttribute("role", "status");
     el.setAttribute("aria-live", "polite");
-    (el as HTMLElement).hidden = true;
+    el.hidden = true;
+    el.dataset.visible = "false";
 
     const text = document.createElement("div");
     text.className = "vjs-osd-text";
@@ -26,14 +27,16 @@ export class PingOsd extends Component {
     this.textEl = text;
 
     const unmute = document.createElement("button");
-    unmute.className = "vjs-unmute-prompt";
+    unmute.className = "vjs-unmute-prompt ping-unmute";
     unmute.type = "button";
     unmute.textContent = "🔊 Clique para ativar o som";
     unmute.hidden = true;
+    unmute.dataset.visible = "false";
     unmute.addEventListener("click", () => {
       this.player().muted(false);
       this.player().volume(1);
       unmute.hidden = true;
+      unmute.dataset.visible = "false";
       this.showToast("Som ativado");
     });
     el.appendChild(unmute);
@@ -44,7 +47,7 @@ export class PingOsd extends Component {
 
   private getTextElement(): HTMLElement {
     if (!this.textEl) {
-      const el = this.el();
+      const el = this.el() as HTMLElement;
       this.textEl = (el?.querySelector(".vjs-osd-text") || el) as HTMLElement;
     }
     return this.textEl;
@@ -57,12 +60,14 @@ export class PingOsd extends Component {
 
     if (state === "none" || state === "live") {
       el.removeAttribute("data-state");
+      el.dataset.visible = "false";
       el.hidden = true;
       if (textNode) textNode.textContent = "";
       return;
     }
 
     el.setAttribute("data-state", state);
+    el.dataset.visible = "true";
     el.hidden = false;
 
     if (textNode) {
@@ -89,12 +94,14 @@ export class PingOsd extends Component {
     }
 
     el.setAttribute("data-state", "toast");
+    el.dataset.visible = "true";
     if (textNode) textNode.textContent = text;
     el.hidden = false;
 
     this.hideTimer = window.setTimeout(() => {
       if (el.getAttribute("data-state") === "toast") {
         el.removeAttribute("data-state");
+        el.dataset.visible = "false";
         el.hidden = true;
         if (textNode) textNode.textContent = "";
       }
@@ -102,14 +109,30 @@ export class PingOsd extends Component {
   }
 
   showUnmutePrompt() {
-    if (this.unmuteCard) this.unmuteCard.hidden = false;
-    const el = this.el() as HTMLElement;
-    if (el) el.hidden = false;
+    if (this.unmuteCard) {
+      this.unmuteCard.hidden = false;
+      this.unmuteCard.dataset.visible = "true";
+      const el = this.el() as HTMLElement;
+      if (el) {
+        el.hidden = false;
+        el.dataset.visible = "true";
+      }
+    }
   }
 
-  hideUnmutePrompt() {
-    if (this.unmuteCard) this.unmuteCard.hidden = true;
+  toggle(): void {
+    const el = this.el() as HTMLElement;
+    if (!el) return;
+    const isVisible = el.dataset.visible === "true" || !el.hidden;
+    if (isVisible) {
+      el.dataset.visible = "false";
+      el.hidden = true;
+    } else {
+      el.dataset.visible = "true";
+      el.hidden = false;
+    }
   }
 }
 
-videojs.registerComponent("PingOsd", PingOsd);
+(videojs as any).registerComponent("PingOsd", PingOsd);
+

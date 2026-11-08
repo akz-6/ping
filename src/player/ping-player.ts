@@ -55,7 +55,7 @@ export class PingPlayer {
       targetEl.appendChild(this.videoEl);
     }
 
-    this.videoEl.classList.add("video-js", "vjs-default-skin");
+    this.videoEl.classList.add("video-js", "vjs-default-skin", "ping-skin");
 
     this.player = videojs(this.videoEl, {
       controls: true,
@@ -244,6 +244,11 @@ export class PingPlayer {
         }
         break;
       }
+      case "s": {
+        e.preventDefault();
+        this.osd?.toggle();
+        break;
+      }
       case "d": {
         e.preventDefault();
         opts.onOpenStats?.();
@@ -290,6 +295,9 @@ export class PingPlayer {
 
   showState(state: "paused" | "stopped" | "reconnecting" | "live" | "none", message?: string): void {
     this.osd?.showState(state, message);
+    if (this.liveBadge && typeof (this.liveBadge as any).setState === "function") {
+      (this.liveBadge as any).setState(state === "paused" ? "paused" : state === "reconnecting" ? "reconnecting" : "live");
+    }
   }
 
   setTheaterState(isTheater: boolean): void {

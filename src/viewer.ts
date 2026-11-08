@@ -70,9 +70,9 @@ function formatDeniedMessage(reason: DeniedReason | undefined): string {
 }
 
 const TEMPLATE = `
-<main class="viewer" aria-label="Reprodutor da transmissão">
-  <div class="palco-layout" id="palco">
-    <div class="palco-stage" id="stage">
+<main class="viewer ping-stage" id="stage" aria-label="Reprodutor da transmissão" data-chat="visible" data-theater="false">
+  <div class="palco-layout ping-stage__frame" id="palco">
+    <div class="palco-stage ping-stage__player" id="stage-inner">
       <video id="v" autoplay playsinline muted></video>
   <div id="pause-overlay" class="paused-overlay" hidden>
     <div class="paused-card">
@@ -204,6 +204,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const toggleTheater = (force?: boolean): void => {
     const isNow = typeof force === "boolean" ? force : !container.classList.contains("theater-mode");
     container.classList.toggle("theater-mode", isNow);
+    container.dataset.theater = String(isNow);
     pingPlayer?.setTheaterState(isNow);
     const thBtn = root.querySelector<HTMLButtonElement>("#theater");
     if (thBtn) thBtn.classList.toggle("active", isNow);
@@ -325,7 +326,10 @@ export function mountViewer(root: HTMLElement, room: string): void {
     },
     onFpsChange: (fps) => setFpsChoice(String(fps), true),
     onOpenStats: () => toggleStatsModal(),
-    onChatToggle: () => chatUi.toggleChat(),
+    onChatToggle: () => {
+      chatUi.toggleChat();
+      container.dataset.chat = chatUi.isChatOpen() ? "visible" : "hidden";
+    },
     onTheaterChange: () => toggleTheater(),
     onMuteToggle: () => {
       toggleMute();
