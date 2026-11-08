@@ -22,7 +22,7 @@ export interface StoredRoom {
 }
 
 const BLOB_FILENAME = "rooms-catalog.json";
-const MAX_STALE_MS = 60_000; // 60 segundos sem heartbeat considera inativa
+const MAX_STALE_MS = 30 * 60 * 1000; // 60 segundos sem heartbeat considera inativa
 const MAX_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 horas máximo de vida útil da sala
 const OWNER_KEY = (process.env.OWNER_KEY || "0604").trim();
 
@@ -163,7 +163,7 @@ export default async function handler(req: any, res: any) {
         ((body as any).creatorKey && (body as any).creatorKey === OWNER_KEY);
 
       // Limite de 2 salas abertas no catálogo global (exceto se criado pelo dono com master key)
-      if (!body.isPrivate && !body.hidden && !isOwner && openCount >= 2) {
+      if (!body.isPrivate && !body.hidden && !isOwner && openCount >= 10) {
         return res.status(403).json({ error: "LIMITE_SALAS_ABERTAS" });
       }
 

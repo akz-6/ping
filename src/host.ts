@@ -1144,10 +1144,8 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       isLiveActive = true;
       stopStreamBtn.textContent = "⏹️ Parar Live";
       stopStreamBtn.classList.remove("active");
-      const token = mountOpts.hostToken || sessionStorage.getItem("ping:host_token:" + openedId) || "";
-      if (token) {
-        hostLifecycle = startHostLifecycle({ roomId: openedId, hostToken: token });
-      }
+      const token = mountOpts.hostToken || sessionStorage.getItem("ping:host_token:" + openedId) || "host";
+      hostLifecycle = startHostLifecycle({ roomId: openedId, hostToken: token });
       broadcastCount();
 
       clearStatsInterval();

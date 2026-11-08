@@ -58,16 +58,17 @@ export function isCreatorAuthorized(): boolean {
       return true;
     }
 
-    // 2. Em localhost (testes automatizados e desenvolvimento local), a máquina é autorizada
-    const host = location.hostname;
+    // 2. Se for forçado em teste automatizado para testar o modal de bloqueio
     const forceNonLocal = (window as unknown as { __forceNonLocalhost?: boolean }).__forceNonLocalhost;
-    if (!forceNonLocal && (host === "localhost" || host === "127.0.0.1" || host === "::1")) {
-      return true;
+    if (forceNonLocal) {
+      return false;
     }
+
+    // 3. Em produção aberta e localhost, a criação de salas é liberada para todos os usuários
+    return true;
   } catch {
-    // ignora falhas de acesso ao localStorage
+    return true;
   }
-  return false;
 }
 
 export async function authorizeCreator(candidate: string): Promise<boolean> {
