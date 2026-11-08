@@ -7,6 +7,7 @@ import "./components/theater-button";
 import "./components/stats-button";
 import "./components/quality-menu";
 import "./components/fps-menu";
+import "./components/chat-button";
 import "./components/osd";
 
 import { PingLiveBadge } from "./components/live-badge";
@@ -14,6 +15,7 @@ import { PingTheaterButton } from "./components/theater-button";
 import { PingStatsButton } from "./components/stats-button";
 import { PingQualityMenu } from "./components/quality-menu";
 import { PingFpsMenu } from "./components/fps-menu";
+import { PingChatButton } from "./components/chat-button";
 import { PingOsd } from "./components/osd";
 import type { QualityPreset } from "../protocol";
 
@@ -34,6 +36,7 @@ export class PingPlayer {
   private qualityMenu!: PingQualityMenu;
   private fpsMenu!: PingFpsMenu;
   private theaterBtn!: PingTheaterButton;
+  public chatBtn!: PingChatButton;
   public statsBtn!: PingStatsButton;
   public liveBadge!: PingLiveBadge;
   private osd!: PingOsd;
@@ -123,6 +126,7 @@ export class PingPlayer {
       this.qualityMenu = cb.addChild("PingQualityMenu", {}) as unknown as PingQualityMenu;
       this.fpsMenu = cb.addChild("PingFpsMenu", {}) as unknown as PingFpsMenu;
       this.statsBtn = cb.addChild("PingStatsButton", {}) as unknown as PingStatsButton;
+      this.chatBtn = cb.addChild("PingChatButton", {}) as unknown as PingChatButton;
       this.theaterBtn = cb.addChild("PingTheaterButton", {}) as unknown as PingTheaterButton;
 
       // Adiciona IDs aos botões padrão para compatibilidade com seletores
@@ -162,6 +166,10 @@ export class PingPlayer {
 
     this.player.on("openstatsmodal", () => {
       opts.onOpenStats?.();
+    });
+
+    this.player.on("chattoggle", () => {
+      opts.onChatToggle?.();
     });
 
     this.player.on("theatermodechange", () => {
@@ -286,6 +294,14 @@ export class PingPlayer {
 
   setTheaterState(isTheater: boolean): void {
     this.theaterBtn?.setTheaterState(isTheater);
+  }
+
+  setChatUnread(count: number): void {
+    this.chatBtn?.setUnread(count);
+  }
+
+  setChatActive(isOpen: boolean): void {
+    this.chatBtn?.setActive(isOpen);
   }
 
   getVideoElement(): HTMLVideoElement {

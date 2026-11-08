@@ -304,12 +304,21 @@ export function parseToViewer(data: unknown): ToViewer | null {
 }
 
 /** Valida metadados opcionais do DataConnection. */
-export function parseConnectionMetadata(meta: unknown): { clientId?: string } {
+export function parseConnectionMetadata(meta: unknown): { clientId?: string; name?: string } {
   if (!isPlainObject(meta)) return {};
+  const out: { clientId?: string; name?: string } = {};
   if (typeof meta.clientId === "string" && CLIENT_ID_RE.test(meta.clientId)) {
-    return { clientId: meta.clientId };
+    out.clientId = meta.clientId;
   }
-  return {};
+  if (
+    typeof meta.name === "string" &&
+    meta.name.trim().length > 0 &&
+    meta.name.trim().length <= 32 &&
+    !CONTROL_CHARS_RE.test(meta.name)
+  ) {
+    out.name = meta.name.trim();
+  }
+  return out;
 }
 
 /** Gera hash SHA-256 hex (64 chars) da senha com sal do ID da sala via Web Crypto API. */

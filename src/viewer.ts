@@ -21,6 +21,8 @@ import {
 } from "./stats";
 import { $, copyText, shortId } from "./ui";
 import { PingPlayer } from "./player/ping-player";
+import { ChatUi } from "./chat/chat-ui";
+import { getProfile } from "./app/identity";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BACKOFF_MS = [1000, 2000, 3000, 5000, 8000];
@@ -65,7 +67,9 @@ function formatDeniedMessage(reason: DeniedReason | undefined): string {
 
 const TEMPLATE = `
 <main class="viewer" aria-label="Reprodutor da transmissão">
-  <video id="v" autoplay playsinline muted></video>
+  <div class="palco-layout" id="palco">
+    <div class="palco-stage" id="stage">
+      <video id="v" autoplay playsinline muted></video>
   <div id="pause-overlay" class="paused-overlay" hidden>
     <div class="paused-card">
       <span class="paused-icon">⏸️</span>
@@ -142,6 +146,9 @@ const TEMPLATE = `
     </select>
     <span id="stats" class="stats" aria-live="off"></span>
     <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico da conexão em JSON">Diagnóstico</button>
+  </div>
+    </div>
+    <div id="chat-mount"></div>
   </div>
 </main>
 `;
@@ -280,6 +287,28 @@ export function mountViewer(root: HTMLElement, room: string): void {
     webkitVideo.webkitEnterFullscreen?.();
   };
 
+  const chatMount = $<HTMLElement>(root, "#chat-mount");
+  const palcoLayout = $<HTMLElement>(root, "#palco");
+
+  let chatUi: ChatUi;
+  chatUi = new ChatUi({
+    initialOpen: window.innerWidth >= 900,
+    onSendMessage: (text) => {
+      if (conn && conn.open) {
+        conn.send({ t: "chat-send", text } satisfies ToHost);
+      }
+    },
+    onToggleChange: (isOpen) => {
+      palcoLayout.classList.toggle("chat-hidden", !isOpen);
+      pingPlayer?.setChatActive(isOpen);
+    },
+    onUnreadChange: (count) => {
+      pingPlayer?.setChatUnread(count);
+    },
+  });
+  chatMount.replaceWith(chatUi.getElement());
+  palcoLayout.classList.toggle("chat-hidden", !chatUi.isChatOpen());
+
   pingPlayer = new PingPlayer(video, {
     onQualityChange: (preset) => setQualityPreset(preset, true),
     onQualityCycle: () => {
@@ -290,6 +319,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
     },
     onFpsChange: (fps) => setFpsChoice(String(fps), true),
     onOpenStats: () => toggleStatsModal(),
+    onChatToggle: () => chatUi.toggleChat(),
     onTheaterChange: () => toggleTheater(),
     onMuteToggle: () => {
       toggleMute();
@@ -300,6 +330,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
       showOsd(document.fullscreenElement ? "🔲 Janela normal" : "🔲 Tela cheia");
     },
   });
+  pingPlayer.setChatActive(chatUi.isChatOpen());
 
   const osdEl = $<HTMLElement>(root, "#osd");
   const bar = $<HTMLElement>(root, "#bar");
@@ -626,10 +657,11 @@ export function mountViewer(root: HTMLElement, room: string): void {
           : "Procurando a sala…",
       );
 
+      const myProfile = getProfile();
       const c = p.connect(room, {
         reliable: true,
         serialization: "json",
-        metadata: { clientId },
+        metadata: { clientId, name: myProfile.displayName },
       });
       conn = c;
 
@@ -742,6 +774,27 @@ export function mountViewer(root: HTMLElement, room: string): void {
           case "pause": {
             pauseOverlay.hidden = !msg.paused;
             showOsd(msg.paused ? "⏸️ Transmissão pausada pelo anfitrião" : "▶️ Transmissão retomada");
+            break;
+          }
+
+          case "chat-history": {
+            chatUi.loadHistory(msg.msgs);
+            break;
+          }
+
+          case "chat-msg": {
+            chatUi.addMessage(msg.msg);
+            break;
+          }
+
+          case "chat-rejected": {
+            if (msg.reason === "rate") {
+              chatUi.showNotice("Você está enviando mensagens muito rápido. Aguarde um instante.", true);
+            } else if (msg.reason === "muted") {
+              chatUi.showNotice("Você foi silenciado temporariamente por 30s devido a spam.", true);
+            } else {
+              chatUi.showNotice("Mensagem inválida.", true);
+            }
             break;
           }
 

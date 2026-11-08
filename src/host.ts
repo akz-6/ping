@@ -30,6 +30,9 @@ import {
 import { $, copyText, shortId, toast } from "./ui";
 import { startHostLifecycle, type HostLifecycleHandle } from "./app/services/supabase";
 import type { Room } from "./app/services/rooms";
+import { ChatHub } from "./chat/chat-hub";
+import { ChatUi } from "./chat/chat-ui";
+import { getProfile } from "./app/identity";
 
 const STORAGE_UPLOAD_KEY = "ping_upload_mbps";
 const DEFAULT_UPLOAD_MBPS = 50;
@@ -228,65 +231,70 @@ const TEMPLATE = `
   </section>
 
   <section class="card" id="live" hidden>
-    <div class="preview-wrap">
-      <video id="preview" muted autoplay playsinline aria-label="Pré-visualização da tela capturada"></video>
-      <div class="discord-live-pill"><span class="pulse-dot"></span> AO VIVO</div>
-      <div id="host-paused-overlay" class="paused-overlay" hidden>
-        <span>⏸️ Transmissão Pausada</span>
-      </div>
-      <div id="host-stopped-overlay" class="stopped-overlay" hidden>
-        <div class="stopped-box">
-          <p class="stopped-title">⏹️ Transmissão Parada</p>
-          <p class="muted stopped-desc">A sala continua aberta com o mesmo link para os seus amigos!</p>
-          <button id="btn-resume-live" type="button" class="primary sm resume-live-btn">▶️ Iniciar Transmissão</button>
+    <div class="palco-layout palco-layout-host" id="host-palco">
+      <div class="palco-stage">
+        <div class="preview-wrap">
+          <video id="preview" muted autoplay playsinline aria-label="Pré-visualização da tela capturada"></video>
+          <div class="discord-live-pill"><span class="pulse-dot"></span> AO VIVO</div>
+          <div id="host-paused-overlay" class="paused-overlay" hidden>
+            <span>⏸️ Transmissão Pausada</span>
+          </div>
+          <div id="host-stopped-overlay" class="stopped-overlay" hidden>
+            <div class="stopped-box">
+              <p class="stopped-title">⏹️ Transmissão Parada</p>
+              <p class="muted stopped-desc">A sala continua aberta com o mesmo link para os seus amigos!</p>
+              <button id="btn-resume-live" type="button" class="primary sm resume-live-btn">▶️ Iniciar Transmissão</button>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <input id="link" readonly aria-label="Link da sala" />
+          <button id="copy" type="button" class="primary">Copiar link</button>
+        </div>
+        <div class="row live-toolbar">
+          <button id="change-source" type="button" class="btn-discord-tool" title="Trocar janela ou tela compartilhada">🖥️ Trocar Tela</button>
+          <button id="pause-stream" type="button" class="btn-discord-tool" title="Pausar ou retomar vídeo da transmissão">⏸️ Pausar Tela</button>
+          <button id="stop-stream" type="button" class="btn-discord-tool" title="Parar transmissão da live mantendo a sala e o link abertos">⏹️ Parar Live</button>
+          <button id="mute-audio" type="button" class="btn-discord-tool" title="Silenciar ou ativar áudio da transmissão">🔊 Áudio Ativo</button>
+        </div>
+        <div class="row live-room-settings">
+          <button id="btn-toggle-visibility" type="button" class="btn-discord-pill" title="Alternar se a sala aparece ou não no lobby de salas">👁️ Sala Visível no Lobby</button>
+          <button id="btn-change-password" type="button" class="btn-discord-pill" title="Alterar ou definir a senha desta sala">🔑 Alterar Senha</button>
+          <button id="btn-remove-password" type="button" class="btn-discord-pill" title="Remover a senha e deixar a sala aberta para todos">🔓 Tirar Senha</button>
+        </div>
+        <div class="row between">
+          <div class="live-meta">
+            <span id="count" class="muted" role="status" aria-live="polite">0 espectadores</span>
+            <span id="capacity-info" class="muted"></span>
+          </div>
+          <button id="stop" type="button" class="danger">Encerrar</button>
+        </div>
+        <p class="warn" id="capacity-warn" role="status" hidden></p>
+        <div id="pending-wrap" class="pending-wrap" role="region" aria-label="Solicitações de entrada pendentes" hidden>
+          <p class="pending-title">Aguardando aprovação</p>
+          <div id="pending-list" class="pending-list"></div>
+        </div>
+        <div id="stats-wrap" class="stats-wrap" hidden>
+          <table class="stats-table" aria-label="Estatísticas por espectador">
+            <thead>
+              <tr>
+                <th>Espectador</th>
+                <th>Codec</th>
+                <th>Bitrate</th>
+                <th>FPS</th>
+                <th>RTT</th>
+                <th>Limitação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="stats-body"></tbody>
+          </table>
+        </div>
+        <div class="row between live-actions">
+          <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico em JSON">Copiar diagnóstico (JSON)</button>
         </div>
       </div>
-    </div>
-    <div class="row">
-      <input id="link" readonly aria-label="Link da sala" />
-      <button id="copy" type="button" class="primary">Copiar link</button>
-    </div>
-    <div class="row live-toolbar">
-      <button id="change-source" type="button" class="btn-discord-tool" title="Trocar janela ou tela compartilhada">🖥️ Trocar Tela</button>
-      <button id="pause-stream" type="button" class="btn-discord-tool" title="Pausar ou retomar vídeo da transmissão">⏸️ Pausar Tela</button>
-      <button id="stop-stream" type="button" class="btn-discord-tool" title="Parar transmissão da live mantendo a sala e o link abertos">⏹️ Parar Live</button>
-      <button id="mute-audio" type="button" class="btn-discord-tool" title="Silenciar ou ativar áudio da transmissão">🔊 Áudio Ativo</button>
-    </div>
-    <div class="row live-room-settings">
-      <button id="btn-toggle-visibility" type="button" class="btn-discord-pill" title="Alternar se a sala aparece ou não no lobby de salas">👁️ Sala Visível no Lobby</button>
-      <button id="btn-change-password" type="button" class="btn-discord-pill" title="Alterar ou definir a senha desta sala">🔑 Alterar Senha</button>
-      <button id="btn-remove-password" type="button" class="btn-discord-pill" title="Remover a senha e deixar a sala aberta para todos">🔓 Tirar Senha</button>
-    </div>
-    <div class="row between">
-      <div class="live-meta">
-        <span id="count" class="muted" role="status" aria-live="polite">0 espectadores</span>
-        <span id="capacity-info" class="muted"></span>
-      </div>
-      <button id="stop" type="button" class="danger">Encerrar</button>
-    </div>
-    <p class="warn" id="capacity-warn" role="status" hidden></p>
-    <div id="pending-wrap" class="pending-wrap" role="region" aria-label="Solicitações de entrada pendentes" hidden>
-      <p class="pending-title">Aguardando aprovação</p>
-      <div id="pending-list" class="pending-list"></div>
-    </div>
-    <div id="stats-wrap" class="stats-wrap" hidden>
-      <table class="stats-table" aria-label="Estatísticas por espectador">
-        <thead>
-          <tr>
-            <th>Espectador</th>
-            <th>Codec</th>
-            <th>Bitrate</th>
-            <th>FPS</th>
-            <th>RTT</th>
-            <th>Limitação</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody id="stats-body"></tbody>
-      </table>
-    </div>
-    <div class="row between live-actions">
-      <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico em JSON">Copiar diagnóstico (JSON)</button>
+      <div id="host-chat-mount"></div>
     </div>
   </section>
 </main>
@@ -614,6 +622,44 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     }
   };
 
+  const chatMount = $<HTMLElement>(root, "#host-chat-mount");
+  const hostPalco = $<HTMLElement>(root, "#host-palco");
+
+  const chatHub = new ChatHub({
+    hostUser: {
+      peerId: "host",
+      name: getProfile().displayName || "Anfitrião",
+      badge: "host",
+      avatar: null,
+    },
+    onBroadcast: (msg) => {
+      for (const { conn } of viewers.values()) {
+        send(conn, msg);
+      }
+    },
+    onSendToPeer: (peerId, msg) => {
+      const entry = viewers.get(peerId);
+      if (entry) {
+        send(entry.conn, msg);
+      }
+    },
+    onLocalMessage: (msg) => {
+      chatUi.addMessage(msg);
+    },
+  });
+
+  const chatUi = new ChatUi({
+    initialOpen: window.innerWidth >= 900,
+    onSendMessage: (text) => {
+      chatHub.postHostMessage(text);
+    },
+    onToggleChange: (isOpen) => {
+      hostPalco.classList.toggle("chat-hidden", !isOpen);
+    },
+  });
+  chatMount.replaceWith(chatUi.getElement());
+  hostPalco.classList.toggle("chat-hidden", !chatUi.isChatOpen());
+
   const broadcastCount = (): void => {
     const n = viewers.size;
     countEl.textContent = n === 1 ? "1 espectador" : `${n} espectadores`;
@@ -712,6 +758,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       currentVideoTrack.removeEventListener("ended", stopLive);
       currentVideoTrack = null;
     }
+    chatHub.postSystemMessage("Transmissão encerrada");
     for (const { conn } of pendingViewers.values()) {
       send(conn, { t: "ended" });
     }
@@ -774,6 +821,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     for (const entry of viewers.values()) {
       send(entry.conn, { t: "pause", paused: true });
     }
+    chatHub.postSystemMessage("Transmissão parada");
     toast("Live parada! A sala continua aberta no mesmo link para os seus amigos.");
   };
 
@@ -832,6 +880,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     stopStreamBtn.textContent = "⏹️ Parar Live";
     stopStreamBtn.classList.remove("active");
     toast("Live iniciada novamente no mesmo link!");
+    chatHub.postSystemMessage("Transmissão retomada");
   };
 
   const updateVisibilityUi = (): void => {
@@ -1008,7 +1057,10 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         return;
       }
 
-      const { clientId } = parseConnectionMetadata(conn.metadata);
+      const { clientId, name: metaName } = parseConnectionMetadata(conn.metadata);
+      const viewerName =
+        metaName ||
+        "Espectador " + (clientId ? clientId.slice(0, 4) : conn.peer.slice(0, 4));
       const rateLimitKey = clientId ?? conn.peer;
 
       if (
@@ -1210,6 +1262,8 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           } catch {
             // Ignora erro ao fechar conexão de dados
           }
+          chatHub.postSystemMessage(`${viewerName} saiu da sala`);
+          chatHub.unregisterViewer(conn.peer);
         };
 
         const diagnosticBuffer = new CircularBuffer<HostDiagnosticSample>(300);
@@ -1236,6 +1290,14 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           cleanup,
         };
         viewers.set(conn.peer, entry);
+        chatHub.registerViewer({
+          peerId: conn.peer,
+          name: viewerName,
+          badge: null,
+          avatar: null,
+        });
+        chatHub.sendHistory(conn.peer);
+        chatHub.postSystemMessage(`${viewerName} entrou na sala`);
         applyViewerQuality(entry);
         playJoinChime();
         toast("Um novo espectador entrou na transmissão! 🔔");
@@ -1248,6 +1310,11 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         if (peer !== p || !stream || processingAuth) return;
         const msg = parseToHost(data);
         if (!msg) return;
+
+        if (msg.t === "chat-send") {
+          chatHub.handleViewerSend(conn.peer, msg.text);
+          return;
+        }
 
         if (msg.t === "quality-preset") {
           requestedPresets.set(conn.peer, msg.preset);
@@ -1270,7 +1337,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
           return;
         }
 
-        if (msg.t === "chat-send" || msg.t === "transport-fallback") {
+        if (msg.t === "transport-fallback") {
           return;
         }
 
@@ -1449,6 +1516,11 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     for (const entry of viewers.values()) {
       send(entry.conn, { t: "pause", paused: isStreamPaused });
     }
+    chatHub.postSystemMessage(
+      isStreamPaused
+        ? "Transmissão pausada pelo anfitrião"
+        : "Transmissão retomada",
+    );
     toast(isStreamPaused ? "Transmissão pausada." : "Transmissão retomada.");
   });
 
