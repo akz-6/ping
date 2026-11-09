@@ -267,6 +267,15 @@ body {
   transition: all 0.15s ease;
 }
 
+.legal-sponsor-img {
+  width: 120px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  border: 1px solid var(--legal-border);
+}
+
 .legal-sponsor-banner:hover {
   background: var(--legal-surface-3);
   border-color: var(--legal-border-strong);

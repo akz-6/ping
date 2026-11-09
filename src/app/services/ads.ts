@@ -1,4 +1,4 @@
-import { h, icon } from "../dom";
+import { h } from "../dom";
 
 export type AdSize = "300x250" | "300x600" | "320x100";
 export type ConsentStatus = "accepted" | "essential" | "prompt";
@@ -20,41 +20,43 @@ export interface DirectSponsor {
 }
 
 export const DIRECT_SPONSORS: Record<string, DirectSponsor> = {
-  oracle: {
-    id: "oracle",
-    brand: "Oracle Cloud Free Tier",
+  pingSponsor: {
+    id: "ping-sponsor",
+    brand: "PING Patrocínio",
     badge: "Patrocinado",
-    title: "10 TB / mês de tráfego grátis",
-    description: "Infraestrutura Always Free para hospedar seus nós de mídia, servidores TURN e Coturn WebRTC sem mensalidades.",
-    ctaText: "Acessar Always Free",
-    url: "https://www.oracle.com/cloud/free/",
-    iconName: "refresh",
-    statNumber: "10.000 GB",
-    statLabel: "Tráfego de rede gratuito por mês",
+    title: "Anuncie no PING — Espaço Disponível",
+    description: "Alcance diariamente streamers, gamers e criadores de conteúdo ao vivo. Anúncios diretos e sem bloqueio de AdBlock.",
+    ctaText: "Anuncie sua Marca",
+    url: "mailto:cupboardofdrawings@gmail.com?subject=Anunciar%20no%20PING%20-%20Patrocinio",
+    iconName: "verified",
+    statNumber: "100% Gamer",
+    statLabel: "Streamers e público ativo",
     highlights: [
-      "4 OCPU Ampere ARM & 24 GB RAM",
-      "10 TB de transferência de saída",
-      "2 instâncias AMD gratuitas para sempre",
-      "Ideal para servidores Coturn e WebRTC",
+      "Visibilidade garantida mesmo com AdBlock",
+      "Negociação direta com o criador do Ping",
+      "Destaque na coluna lateral e páginas oficiais",
+      "Contato: cupboardofdrawings@gmail.com",
     ],
   },
-  vercel: {
-    id: "vercel",
-    brand: "Vercel Frontend Cloud",
+  oracle: {
+    id: "ping-sponsor",
+    brand: "PING Patrocínio",
     badge: "Patrocinado",
-    title: "Deploy global com alta performance",
-    description: "Hospede aplicações WebRTC, Next.js e Vite com roteamento inteligente na velocidade da borda.",
-    ctaText: "Começar na Vercel",
-    url: "https://vercel.com",
+    title: "Anuncie no PING — Espaço Disponível",
+    description: "Alcance diariamente streamers, gamers e criadores de conteúdo ao vivo.",
+    ctaText: "Anuncie sua Marca",
+    url: "mailto:cupboardofdrawings@gmail.com?subject=Anunciar%20no%20PING%20-%20Patrocinio",
     iconName: "verified",
-    statNumber: "Global Edge",
-    statLabel: "Rede distribuída ultrarrápida",
-    highlights: [
-      "Deploy contínuo via GitHub",
-      "Proteção DDoS e CDN global",
-      "Visualização instantânea de PRs",
-      "Hospedagem nativa do Ping",
-    ],
+  },
+  vercel: {
+    id: "ping-sponsor",
+    brand: "PING Patrocínio",
+    badge: "Patrocinado",
+    title: "Anuncie no PING — Espaço Disponível",
+    description: "Alcance diariamente streamers, gamers e criadores de conteúdo ao vivo.",
+    ctaText: "Anuncie sua Marca",
+    url: "mailto:cupboardofdrawings@gmail.com?subject=Anunciar%20no%20PING%20-%20Patrocinio",
+    iconName: "verified",
   },
 };
 
@@ -163,6 +165,15 @@ export class DirectSponsorAdProvider implements AdProvider {
       },
       h(
         "div",
+        { class: "ad-creative-media" },
+        h("img", {
+          src: "/branding/ad-banner.svg",
+          alt: "Anuncie no PING",
+          class: "ad-banner-img",
+        }),
+      ),
+      h(
+        "div",
         { class: "ad-creative-head" },
         h("span", { class: "ad-badge" }, s.badge),
         h("span", { class: "ad-brand-tag" }, s.brand),
@@ -170,7 +181,6 @@ export class DirectSponsorAdProvider implements AdProvider {
       h(
         "div",
         { class: "ad-creative-body" },
-        h("div", { class: "ad-icon-row" }, icon(s.iconName, 24)),
         h("strong", { class: "ad-title" }, s.title),
         h("p", { class: "ad-desc" }, s.description),
       ),
@@ -196,6 +206,15 @@ export class DirectSponsorAdProvider implements AdProvider {
         "data-sponsor-id": s.id,
         "aria-label": `${s.badge}: ${s.brand} - ${s.title}`,
       },
+      h(
+        "div",
+        { class: "ad-creative-media" },
+        h("img", {
+          src: "/branding/ad-banner.svg",
+          alt: "Anuncie no PING",
+          class: "ad-banner-img",
+        }),
+      ),
       h(
         "div",
         { class: "ad-creative-head" },
@@ -237,6 +256,15 @@ export class DirectSponsorAdProvider implements AdProvider {
         "data-sponsor-id": s.id,
         "aria-label": `${s.badge}: ${s.brand} - ${s.title}`,
       },
+      h(
+        "div",
+        { class: "ad-mini-img-wrap" },
+        h("img", {
+          src: "/branding/ad-banner.svg",
+          alt: "Anuncie no PING",
+          class: "ad-mini-img",
+        }),
+      ),
       h(
         "div",
         { class: "ad-mini-col" },
@@ -346,6 +374,16 @@ export class GoogleAdSenseProvider implements AdProvider {
 
     try {
       ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+      // Anti-branco & Anti-adblock: Se em 1200ms o Google AdSense não tiver renderizado conteúdo
+      // ou se tiver ficado sem preenchimento / bloqueado, faz o fallback gracioso para o banner do PING
+      window.setTimeout(() => {
+        if (!container.isConnected) return;
+        const iframe = ins.querySelector("iframe");
+        const unfilled = ins.getAttribute("data-ad-status") === "unfilled";
+        if (unfilled || !iframe || iframe.offsetHeight === 0) {
+          this.fallbackProvider.render(container, size);
+        }
+      }, 1200);
     } catch {
       this.fallbackProvider.render(container, size);
     }

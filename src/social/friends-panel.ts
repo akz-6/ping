@@ -29,18 +29,24 @@ export function mountFriendsPanel(opts: FriendsPanelOptions): () => void {
     return () => root.replaceChildren();
   }
 
-  const unsubscribe = service.subscribe((snap) => render(snap));
+  const unsubscribe = service.subscribe((snap, status, error) => render(snap, status, error));
   service.start();
 
-  function render(snap: FriendsSnapshot | null): void {
-    const head = div('friends__head');
+  function render(snap: FriendsSnapshot | null, status?: string, error?: string): void {
+    const head = div('friends__head ping-friends-header');
+    const headWrap = div('friends__head-info');
     const title = document.createElement('h2');
     title.className = 'friends__title';
     title.textContent = 'Amigos';
-    head.appendChild(title);
+    const count = document.createElement('span');
+    count.className = 'ping-friends-count';
+    const onlineCount = snap?.friends.filter((f) => f.presence === 'online' || f.presence === 'hosting' || f.presence === 'watching').length ?? 0;
+    count.textContent = snap ? `${onlineCount} amigos online` : 'Amigos conectados';
+    headWrap.append(title, count);
+    head.appendChild(headWrap);
 
     const form = document.createElement('form');
-    form.className = 'friends__add';
+    form.className = 'friends__add ping-add-friend';
     form.setAttribute('data-action', 'add-friend');
     const input = document.createElement('input');
     input.type = 'text';
@@ -48,7 +54,7 @@ export function mountFriendsPanel(opts: FriendsPanelOptions): () => void {
     input.placeholder = 'Adicionar por @usuário';
     input.setAttribute('aria-label', 'Username do amigo');
     input.maxLength = 40;
-    const add = button('Adicionar', 'btn btn--sm button button--secondary', 'submit');
+    const add = button('Adicionar', 'btn btn--sm button button--secondary ping-button ping-button--secondary', 'submit');
     form.append(input, add);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -58,17 +64,38 @@ export function mountFriendsPanel(opts: FriendsPanelOptions): () => void {
       const res = await service.request(handle);
       add.disabled = false;
       if (res.ok) { input.value = ''; opts.toast('Pedido enviado.'); }
-      else opts.toast(ERRORS[res.error], 'error');
+      else opts.toast(ERRORS[res.error as FriendsApiError] || 'Não foi possível concluir.', 'error');
     });
 
     const nodes: Node[] = [head, form];
 
     if (snap && snap.incoming.length) nodes.push(requestsView(snap.incoming));
 
-    if (!snap) {
-      nodes.push(note('Carregando amigos...'));
-    } else if (!snap.friends.length) {
-      nodes.push(note('Você ainda não tem amigos no Ping. Adicione alguém pelo @usuário do Discord.'));
+    const listWrap = div('ping-friends-list friends__list');
+
+    if (!snap && status === 'loading') {
+      const loading = div('ping-friends-loading friends__loading');
+      const sk1 = div('ping-skeleton');
+      const sk2 = div('ping-skeleton');
+      loading.append(sk1, sk2);
+      listWrap.append(loading);
+    } else if (!snap && status === 'error') {
+      const errBox = div('ping-friends-empty friends-error');
+      const p = document.createElement('p');
+      p.textContent = error === 'unauthenticated' ? 'Entre com o Discord para carregar amigos.' : 'Erro ao conectar aos servidores de amigos.';
+      const retryBtn = button('Tentar novamente', 'btn btn--sm button button--secondary', 'button');
+      retryBtn.addEventListener('click', () => {
+        retryBtn.disabled = true;
+        void service.refresh().finally(() => { retryBtn.disabled = false; });
+      });
+      errBox.append(p, retryBtn);
+      listWrap.append(errBox);
+    } else if (!snap || !snap.friends.length) {
+      const empty = div('ping-friends-empty friends__empty');
+      const p = document.createElement('p');
+      p.textContent = 'Você ainda não tem amigos no Ping. Adicione alguém pelo @usuário do Discord.';
+      empty.append(p);
+      listWrap.append(empty);
     } else {
       const groups: [string, Friend[]][] = [
         ['Transmitindo', snap.friends.filter((f) => f.presence === 'hosting')],
@@ -80,26 +107,35 @@ export function mountFriendsPanel(opts: FriendsPanelOptions): () => void {
         const g = document.createElement('p');
         g.className = 'friends__group';
         g.textContent = `${label} (${list.length})`;
-        nodes.push(g, ...list.map(friendRow));
+        listWrap.append(g, ...list.map(friendRow));
       }
     }
+    nodes.push(listWrap);
 
     const toggle = document.createElement('label');
-    toggle.className = 'switch-row activity-setting';
-    const text = div('switch-row__text');
-    text.textContent = 'Mostrar minha atividade';
-    const small = document.createElement('small');
-    small.textContent = 'Amigos veem se você está online e em qual sala pública.';
-    text.appendChild(small);
+    toggle.className = 'ping-activity-setting switch-row activity-setting';
+    const textWrap = div('ping-activity-setting-text');
+    const strong = document.createElement('strong');
+    strong.textContent = 'Mostrar minha atividade';
+    const p = document.createElement('p');
+    p.textContent = 'Amigos veem se você está online e em qual sala pública.';
+    textWrap.append(strong, p);
+
+    const switchLabel = document.createElement('span');
+    switchLabel.className = 'ping-switch';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.name = 'showActivity';
     cb.checked = snap?.settings.showActivity ?? true;
     cb.addEventListener('change', async () => {
       const res = await service.setShowActivity(cb.checked);
-      if (!res.ok) { cb.checked = !cb.checked; opts.toast(ERRORS[res.error], 'error'); }
+      if (!res.ok) { cb.checked = !cb.checked; opts.toast(ERRORS[res.error as FriendsApiError] || 'Erro', 'error'); }
     });
-    toggle.append(text, cb);
+    const slider = document.createElement('span');
+    slider.className = 'ping-switch__slider';
+    switchLabel.append(cb, slider);
+
+    toggle.append(textWrap, switchLabel);
     nodes.push(toggle);
 
     root.replaceChildren(...nodes);
@@ -191,12 +227,6 @@ function div(className: string): HTMLElement {
   const d = document.createElement('div');
   d.className = className;
   return d;
-}
-function note(text: string): HTMLElement {
-  const p = document.createElement('p');
-  p.className = 'friends__group';
-  p.textContent = text;
-  return p;
 }
 function button(text: string, className: string, type: 'button' | 'submit' = 'button'): HTMLButtonElement {
   const b = document.createElement('button');

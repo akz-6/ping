@@ -93,11 +93,11 @@
   --shadow-pop: 0 16px 44px rgb(0 0 0 / 0.6);
   --shadow-primary: 0 6px 20px rgb(229 37 50 / 0.25);
 
-  --sidebar-width: 248px;
-  --friends-width: 280px;
+  --sidebar-width: 260px;
+  --friends-width: 276px;
   --max-content-width: 1680px;
-  --nav-w: 248px;
-  --rail-w: 280px;
+  --nav-w: 260px;
+  --rail-w: 276px;
   --chat-w: 340px;
   --chat-width: 340px;
   --header-h: 56px;
@@ -105,6 +105,27 @@
   --z-osd: 50;
   --z-modal: 100;
   --z-toast: 200;
+
+  /* Aliases do Design System PING v2.0 */
+  --ping-bg: #09090b;
+  --ping-sidebar: #080809;
+  --ping-surface: #121317;
+  --ping-surface-2: #191a1f;
+  --ping-surface-3: #22232a;
+  --ping-red: #e52532;
+  --ping-red-hover: #ff3542;
+  --ping-red-soft: rgb(229 37 50 / 0.12);
+  --ping-white: #ffffff;
+  --ping-text: #f5f5f6;
+  --ping-muted: #9698a1;
+  --ping-border: #292a31;
+  --ping-online: #28c76f;
+  --ping-sidebar-width: 260px;
+  --ping-friends-width: 276px;
+  --ping-radius-sm: 9px;
+  --ping-radius-md: 13px;
+  --ping-radius-lg: 17px;
+  --ping-transition: 180ms ease;
 
   /* Aliases semânticos para compatibilidade total */
   --card: var(--surface-1);

@@ -53,49 +53,46 @@ export function SidebarNav(opts: {
     "button",
     {
       type: "button",
-      class: "profile-card sidebar__profile",
+      class: "profile-card sidebar__profile ping-user-card",
+      "data-action": "open-profile",
       "aria-label": `Abrir perfil de ${initialName}`,
       onClick: () => opts.onNavigate("profile"),
     },
     avatarWrap,
-    h("span", { class: "profile-text profile-info" }, nameEl, badgeEl),
+    h("span", { class: "profile-text profile-info ping-user-card__info" }, nameEl, badgeEl),
   );
 
   const el = h(
     "aside",
-    { class: "sidebar ping-nav" },
+    { class: "sidebar ping-nav ping-sidebar" },
     h(
       "div",
-      { class: "sidebar__brand brand-row ping-logo" },
+      { class: "sidebar__brand brand-row ping-logo ping-brand brand-name" },
       h(
         "div",
-        { class: "sidebar__logo-card" },
+        { class: "sidebar__logo-card ping-brand__logo-frame" },
         h("img", {
           src: "/branding/ping-logo.png",
           alt: "PING",
-          class: "sidebar__logo",
+          class: "sidebar__logo ping-brand__logo",
         }),
       ),
-      h(
-        "div",
-        { class: "sidebar__brand-text" },
-        h("span", { class: "brand-name ping-brand" }, "Ping"),
-        h("span", { class: "live-dot", "aria-hidden": "true" }),
-      ),
+      h("span", { class: "sr-only" }, "Ping"),
     ),
     h(
       "button",
       {
         type: "button",
-        class: "btn btn-primary btn-block sidebar-create button button--primary sidebar__create",
+        class: "btn btn-primary btn-block sidebar-create button button--primary sidebar__create ping-button ping-button--primary ping-sidebar__create",
         id: "sidebar-create",
+        "data-action": "create-room",
         "aria-label": "Criar sala",
         onClick: () => opts.onNavigate("create"),
       },
-      icon("plus", 16),
+      icon("plus", 17),
       h("span", { class: "btn-label" }, "Criar Sala"),
     ),
-    h("nav", { class: "nav-list sidebar__navigation", "aria-label": "Principal" }, ...items),
+    h("nav", { class: "nav-list sidebar__navigation ping-navigation", "aria-label": "Principal" }, ...items),
     profileBtn,
   );
 
@@ -373,22 +370,26 @@ export function EmptyState(
   text: string,
   action?: { label: string; onClick: () => void },
 ): HTMLElement {
+  const iconWrap = document.createElement("div");
+  iconWrap.className = "ping-empty-state__icon";
+  iconWrap.innerHTML = `<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="6" width="38" height="27" rx="4" /><path d="M17 42h14M24 33v9" /><path d="m21 15 9 4.5-9 4.5z" /></svg>`;
+
   return h(
     "div",
-    { class: "empty empty-state" },
-    h(
-      "div",
-      { class: "empty-state__logo-wrap" },
-      h("img", {
-        src: "/branding/ping-logo.png",
-        alt: "PING",
-        class: "empty-state__logo",
-      }),
-    ),
+    { class: "empty empty-state ping-empty-state" },
+    iconWrap,
     h("h2", { class: "empty-title" }, title),
     h("p", { class: "empty-text" }, text),
     action
-      ? h("button", { type: "button", class: "btn btn-primary button button--primary", onClick: action.onClick }, action.label)
+      ? h(
+          "button",
+          {
+            type: "button",
+            class: "btn btn-primary button button--primary ping-button ping-button--primary",
+            onClick: action.onClick,
+          },
+          action.label,
+        )
       : null,
   );
 }

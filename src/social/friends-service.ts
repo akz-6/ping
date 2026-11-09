@@ -1,6 +1,7 @@
 import type { FriendsApiError, FriendsSnapshot, HeartbeatBody } from './types';
 
-type Listener = (snap: FriendsSnapshot | null) => void;
+export type FriendsStatus = 'loading' | 'ready' | 'error';
+export type Listener = (snap: FriendsSnapshot | null, status?: FriendsStatus, error?: FriendsApiError | string) => void;
 
 const POLL_MS = 20_000;
 const BEAT_MS = 30_000;
@@ -8,6 +9,8 @@ const BEAT_MS = 30_000;
 export class FriendsService {
   private listeners = new Set<Listener>();
   private snap: FriendsSnapshot | null = null;
+  private status: FriendsStatus = 'loading';
+  private lastError: FriendsApiError | string = '';
   private pollTimer = 0;
   private beatTimer = 0;
   private context: HeartbeatBody = {};
@@ -15,7 +18,7 @@ export class FriendsService {
 
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
-    fn(this.snap);
+    fn(this.snap, this.status, this.lastError);
     return () => this.listeners.delete(fn);
   }
 
@@ -34,6 +37,8 @@ export class FriendsService {
     window.clearInterval(this.beatTimer);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.snap = null;
+    this.status = 'loading';
+    this.lastError = '';
     this.emit();
   }
 
@@ -45,7 +50,15 @@ export class FriendsService {
 
   async refresh(): Promise<void> {
     const res = await this.call<FriendsSnapshot>('list', 'GET');
-    if (res.ok) { this.snap = res.data; this.emit(); }
+    if (res.ok) {
+      this.snap = res.data;
+      this.status = 'ready';
+      this.lastError = '';
+    } else {
+      this.status = 'error';
+      this.lastError = res.error;
+    }
+    this.emit();
   }
 
   request(handle: string) { return this.mutate('request', { handle: handle.replace(/^@/, '').trim() }); }
@@ -83,7 +96,7 @@ export class FriendsService {
     }
   };
 
-  private emit(): void { this.listeners.forEach((fn) => fn(this.snap)); }
+  private emit(): void { this.listeners.forEach((fn) => fn(this.snap, this.status, this.lastError)); }
 
   private async call<T>(action: string, method: 'GET' | 'POST', body?: Record<string, unknown>):
     Promise<{ ok: true; data: T } | { ok: false; error: FriendsApiError }> {

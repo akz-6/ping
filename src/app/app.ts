@@ -17,7 +17,7 @@ import {
   setBottomActive,
   type NavId,
 } from "./components";
-import { h, normalize } from "./dom";
+import { h, icon, normalize } from "./dom";
 import { getHandle, getProfile, syncDiscordSession } from "./identity";
 import { openCreateRoomModal, openPasswordModal, openProfileModal } from "./modals";
 import { isCreatorAuthorized, openTestingNoticeModal, checkUrlForCreatorKey } from "./auth-gate";
@@ -266,10 +266,7 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
 
     if (status === "ready" && rooms.length === 0) {
       feed.append(
-        EmptyState("Nenhuma sala por aqui ainda", "Seja a primeira pessoa a criar uma sala.", {
-          label: "Criar Sala",
-          onClick: onCreate,
-        }),
+        EmptyState("Nenhuma sala por aqui ainda", "As salas disponíveis aparecerão aqui quando forem criadas."),
       );
       live.textContent = "Nenhuma sala aberta.";
       return;
@@ -310,9 +307,52 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
     if (status === "ready") render();
   });
 
+  const pageHeading = h(
+    "section",
+    { class: "ping-page-heading page-heading" },
+    h(
+      "div",
+      {},
+      h("h1", {}, "Salas"),
+      h("p", {}, "Encontre amigos ou crie sua própria sala."),
+    ),
+    h(
+      "button",
+      {
+        type: "button",
+        class: "ping-button ping-button--primary btn btn-primary heading-create",
+        "data-action": "create-room",
+        onClick: onCreate,
+      },
+      icon("plus", 17),
+      h("span", {}, "Criar Sala"),
+    ),
+  );
+
+  const searchTopbar = h("header", { class: "ping-topbar topbar" }, search);
+  const roomsSection = h("section", { class: "ping-rooms", "aria-label": "Salas disponíveis" }, feed);
+
+  lobby.append(
+    searchTopbar,
+    pageHeading,
+    live,
+    roomsSection,
+  );
+
+  const main = h("main", { class: "main main-content ping-main", id: "main" }, lobby, hostView);
+  const adsRight = h(
+    "aside",
+    { class: "ads-right ping-rail friends-panel-container ping-friends-panel", "aria-label": "Painel Lateral e Amigos" },
+    friendsContainer,
+    AdSlot("300x250"),
+    AdSlot("300x600"),
+  );
+  const adsBelow = h("aside", { class: "ads-below", "aria-label": "Publicidade" }, AdSlot("300x250"));
+  main.append(adsBelow);
+
   const lobbyFooter = h(
     "footer",
-    { class: "lobby-footer footer", role: "contentinfo" },
+    { class: "lobby-footer footer ping-footer", role: "contentinfo" },
     h(
       "nav",
       { class: "lobby-footer-links" },
@@ -329,32 +369,10 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
     ),
   );
 
-  lobby.append(
-    h(
-      "div",
-      { class: "m-header topbar" },
-      h("span", { class: "live-dot", "aria-hidden": "true" }),
-      h("span", { class: "brand-name" }, "Ping"),
-    ),
-    search,
-    hero,
-    live,
-    feed,
-    lobbyFooter,
-  );
+  const contentGrid = h("div", { class: "ping-content-grid content-grid" }, main, adsRight);
+  const workspace = h("div", { class: "ping-workspace workspace" }, contentGrid, lobbyFooter);
 
-  const main = h("main", { class: "main main-content", id: "main" }, lobby, hostView);
-  const adsRight = h(
-    "aside",
-    { class: "ads-right ping-rail friends-panel-container", "aria-label": "Painel Lateral e Amigos" },
-    friendsContainer,
-    AdSlot("300x250"),
-    AdSlot("300x600"),
-  );
-  const adsBelow = h("aside", { class: "ads-below", "aria-label": "Publicidade" }, AdSlot("300x250"));
-  main.append(adsBelow);
-
-  root.replaceChildren(h("div", { class: "app ping-shell app-shell" }, sidebar.el, main, adsRight, bottom));
+  root.replaceChildren(h("div", { class: "app ping-shell app-shell ping-app" }, sidebar.el, workspace, bottom));
   setActive("rooms");
   void load();
 

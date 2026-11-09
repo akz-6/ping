@@ -24,54 +24,74 @@ a { color: inherit; text-decoration: none; }
 }
 html.scroll-lock { overflow: hidden; }
 
-/* ---------- Layout Principal (Desktop 3 Áreas) ---------- */
+/* ---------- Layout Principal (Desktop Dashboard) ---------- */
 .app,
 .ping-shell,
-.app-shell {
+.app-shell,
+.ping-app {
   display: grid;
-  grid-template-columns: var(--sidebar-width, 248px) minmax(0, 1fr) var(--friends-width, 280px);
-  column-gap: 24px;
-  max-width: var(--max-content-width, 1680px);
-  margin: 0 auto;
-  padding: 0 24px;
+  grid-template-columns: var(--ping-sidebar-width, 260px) minmax(0, 1fr);
   min-height: 100vh;
   min-height: 100dvh;
+  width: 100%;
+  background: var(--bg);
+}
+
+.ping-workspace,
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+  padding: 27px 28px 17px;
+  background: var(--bg);
+}
+
+.ping-content-grid,
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--ping-friends-width, 276px);
+  gap: 22px 24px;
+  flex: 1;
+  min-width: 0;
+  align-items: start;
 }
 
 .sidebar,
-.ping-nav {
+.ping-nav,
+.ping-sidebar {
   position: sticky;
   top: 0;
-  align-self: start;
-  height: 100vh;
-  height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: 24px 18px 20px 0;
+  width: var(--ping-sidebar-width, 260px);
+  height: 100vh;
+  height: 100dvh;
+  min-height: 600px;
+  padding: 25px 17px 18px;
+  background: var(--ping-sidebar);
   border-right: 1px solid var(--border);
-  z-index: 20;
+  z-index: 30;
 }
 
 .main,
 .ping-main,
 .main-content {
-  padding: 24px 0 40px;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   width: 100%;
 }
 
 .ads-right,
 .ping-rail,
-.friends-panel-container {
-  position: sticky;
-  top: 24px;
-  align-self: start;
+.friends-panel-container,
+.ping-friends-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: 24px 0;
+  gap: 16px;
   min-width: 0;
+  width: 100%;
 }
 
 .ads-below,
@@ -84,47 +104,50 @@ html.scroll-lock { overflow: hidden; }
 /* ---------- Sidebar: Identidade Visual e Logo ---------- */
 .sidebar__brand,
 .brand-row,
-.ping-logo {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 6px;
-  padding: 2px 0;
-}
-
-.sidebar__logo-card {
+.ping-logo,
+.ping-brand {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  min-height: 68px;
-  padding: 6px 14px;
+  margin-bottom: 24px;
+  padding: 4px 0;
+}
+
+.sidebar__logo-card,
+.ping-brand__logo-frame {
+  width: 108px;
+  height: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   background: var(--white);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 18px rgb(0 0 0 / 0.35);
+  border-radius: var(--ping-radius-lg, 17px);
+  padding: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.24);
   border: 1px solid rgb(255 255 255 / 0.95);
   transition: transform var(--transition), box-shadow var(--transition);
 }
 
-.sidebar__logo-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgb(229 37 50 / 0.25);
+.sidebar__logo-card:hover,
+.ping-brand__logo-frame:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgb(229 37 50 / 0.25);
 }
 
-.sidebar__logo {
+.sidebar__logo,
+.ping-brand__logo {
   display: block;
   width: 100%;
-  max-width: 175px;
-  max-height: 52px;
+  height: 100%;
   object-fit: contain;
 }
 
-.sidebar__brand-text {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 4px;
+.sidebar__create,
+.ping-sidebar__create {
+  width: 100%;
+  min-height: 43px;
+  margin-bottom: 19px;
 }
 
 .brand-name,
@@ -233,8 +256,13 @@ html.scroll-lock { overflow: hidden; }
 }
 
 .profile-card[data-verified="true"] {
-  border-color: var(--discord);
-  box-shadow: 0 0 0 1px rgb(88 101 242 / 0.35);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.profile-card[data-verified="true"]:hover {
+  border-color: var(--primary);
+  background: var(--surface-2);
 }
 
 .profile-avatar-wrap {
@@ -275,8 +303,9 @@ html.scroll-lock { overflow: hidden; }
   white-space: nowrap;
 }
 
-.profile-badge[data-verified="true"] {
-  color: var(--white);
+.profile-badge[data-verified="true"],
+.ping-verified {
+  color: var(--ping-text);
   font-weight: 600;
 }
 
@@ -284,12 +313,13 @@ html.scroll-lock { overflow: hidden; }
   content: "✓ Verificado";
   display: inline-flex;
   align-items: center;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: var(--radius-pill);
-  background: var(--discord);
-  color: var(--on-color);
-  font-size: 10px;
-  font-weight: 700;
+  background: rgb(229 37 50 / 0.18);
+  color: var(--ping-text);
+  border: 1px solid rgb(229 37 50 / 0.32);
+  font-size: 9px;
+  font-weight: 800;
   letter-spacing: 0.02em;
   flex-shrink: 0;
 }
@@ -571,19 +601,29 @@ html.scroll-lock { overflow: hidden; }
   margin-bottom: 24px;
 }
 
+.ping-topbar,
+.topbar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 6px;
+}
+
 .search,
-.search-box {
-  width: min(100%, 720px);
-  height: 48px;
+.search-box,
+.ping-search {
+  width: 100%;
+  height: 46px;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 16px;
+  padding: 0 14px;
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--ping-radius-md, 13px);
   transition: border-color var(--transition), box-shadow var(--transition);
-  margin-bottom: 24px;
+  margin-bottom: 0;
 }
 
 .search:focus-within,
@@ -965,6 +1005,118 @@ html.scroll-lock { overflow: hidden; }
   line-height: 1.45;
 }
 
+.ping-friends-count {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.ping-friends-list,
+.friends__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.ping-friends-loading,
+.friends__loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ping-skeleton {
+  height: 42px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  border-radius: var(--ping-radius-sm, 9px);
+  animation: ping-loading 1.5s infinite;
+}
+
+@keyframes ping-loading {
+  to { background-position: -200% 0; }
+}
+
+.ping-friends-empty,
+.friends__empty,
+.friends-error {
+  padding: 16px 8px;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ping-activity-setting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.ping-activity-setting strong {
+  color: var(--white);
+  font-size: 12px;
+}
+
+.ping-activity-setting p {
+  max-width: 185px;
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.ping-switch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.ping-switch input {
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.ping-switch__slider {
+  position: absolute;
+  inset: 0;
+  background: var(--border-strong);
+  border-radius: 20px;
+  transition: background var(--transition);
+}
+
+.ping-switch__slider::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  background: var(--white);
+  border-radius: 50%;
+  transition: transform var(--transition);
+}
+
+.ping-switch input:checked + .ping-switch__slider {
+  background: var(--primary);
+}
+
+.ping-switch input:checked + .ping-switch__slider::before {
+  transform: translateX(16px);
+}
+
 .switch-row,
 .activity-setting {
   display: flex;
@@ -1010,10 +1162,11 @@ html.scroll-lock { overflow: hidden; }
 .ad-slot {
   display: grid;
   place-items: center;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  border-radius: var(--ping-radius-md, 13px);
   background: var(--surface-1);
   overflow: hidden;
+  color-scheme: dark;
 }
 
 .ad-300x250, .ad-slot--300x250 .ad-slot__box { width: 300px; height: 250px; }
@@ -1029,12 +1182,18 @@ html.scroll-lock { overflow: hidden; }
 }
 .ad-size { font-size: var(--fs-xs); color: var(--text-faint); }
 
-.ad-slot.has-sponsor { border: 1px solid var(--border); }
-.ad-slot.has-adsense { border: none; background: transparent; }
-.adsbygoogle { display: block; width: 100%; height: 100%; min-height: 90px; }
+.ad-slot.has-sponsor { border: 1px solid var(--border); background: var(--surface-1); }
+.ad-slot.has-adsense { border: 1px solid var(--border); background: var(--surface-1); }
+.adsbygoogle { display: block; width: 100%; height: 100%; min-height: 90px; background: transparent !important; }
 .adsbygoogle-300x250 { width: 300px; height: 250px; min-height: 250px; }
 .adsbygoogle-300x600 { width: 300px; height: 600px; min-height: 600px; }
 .adsbygoogle-320x100 { width: 320px; max-width: 100%; height: 100px; min-height: 100px; }
+
+iframe[id^="aswift_"],
+iframe[name^="google_ads_iframe"] {
+  background: transparent !important;
+  color-scheme: dark !important;
+}
 
 .ad-creative {
   display: flex;
@@ -1047,6 +1206,38 @@ html.scroll-lock { overflow: hidden; }
   color: inherit;
   background: var(--surface-1);
   transition: background var(--transition);
+}
+
+.ad-creative-media {
+  width: 100%;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: var(--ping-radius-sm, 9px);
+  margin-bottom: 8px;
+}
+
+.ad-banner-img {
+  width: 100%;
+  height: auto;
+  max-height: 140px;
+  object-fit: cover;
+  display: block;
+}
+
+.ad-mini-img-wrap {
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  margin-right: 10px;
+}
+
+.ad-mini-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .ad-creative:hover { background: var(--surface-2); }
@@ -1238,61 +1429,95 @@ html.scroll-lock { overflow: hidden; }
   color: var(--white);
 }
 
+/* Page Heading */
+.ping-page-heading,
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 14px 0 20px;
+}
+
+.ping-page-heading h1 {
+  margin: 0;
+  color: var(--white);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+
+.ping-page-heading p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.heading-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* Empty State */
 .empty,
-.empty-state {
-  min-height: 290px;
+.empty-state,
+.ping-empty-state {
+  min-height: 250px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 12px;
-  padding: 36px 24px;
+  gap: 10px;
+  padding: 28px 24px;
   text-align: center;
   background:
-    radial-gradient(ellipse at top, rgb(229 37 50 / 0.08), transparent 55%),
+    radial-gradient(ellipse at 50% 0%, rgb(229 37 50 / 0.09), transparent 60%),
     var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  margin-top: var(--space-6);
+  border-radius: var(--ping-radius-lg, 17px);
+  margin-top: 14px;
 }
 
-.empty-state__logo-wrap {
+.ping-empty-state__icon {
+  width: 58px;
+  height: 58px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 80px;
-  height: 80px;
-  padding: 10px;
-  background: var(--white);
-  border-radius: var(--radius-md);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
-  border: 1px solid rgb(255 255 255 / 0.95);
-  margin-bottom: 6px;
+  margin-bottom: 5px;
+  color: var(--primary);
+  background: var(--red-soft);
+  border: 1px solid rgb(229 37 50 / 0.25);
+  border-radius: var(--ping-radius-lg, 17px);
 }
 
-.empty-state__logo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.ping-empty-state__icon svg {
+  width: 34px;
+  height: 34px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .empty-title,
 .empty-state h2,
 .empty-state strong {
   margin: 0;
-  font-size: 19px;
-  font-weight: 800;
   color: var(--white);
+  font-size: 17px;
+  font-weight: 800;
 }
 
 .empty-text,
 .empty-state p {
-  margin: 0 0 8px;
+  max-width: 360px;
+  margin: 0;
   color: var(--text-muted);
-  max-width: 440px;
-  font-size: 14px;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 /* ---------- Modais (<dialog class="dialog">) ---------- */
@@ -1714,16 +1939,26 @@ html.scroll-lock { overflow: hidden; }
 @media (max-width: 1099px) {
   .app,
   .ping-shell,
-  .app-shell {
+  .app-shell,
+  .ping-app {
     grid-template-columns: 76px minmax(0, 1fr);
     padding: 0;
     column-gap: 0;
   }
-  .main, .ping-main, .main-content { padding: 24px 16px; }
-  .ads-right, .ping-rail, .friends-panel-container { display: none; }
+  .ping-content-grid,
+  .content-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .ping-workspace,
+  .workspace {
+    padding: 22px 18px;
+  }
+  .main, .ping-main, .main-content { padding: 0; }
+  .ads-right, .ping-rail, .friends-panel-container, .ping-friends-panel { display: none; }
   .ads-below { display: flex; justify-content: center; margin-top: var(--space-8); }
 
-  .sidebar, .ping-nav {
+  .sidebar, .ping-nav, .ping-sidebar {
     align-items: center;
     padding: 24px 12px;
     border-right: 1px solid var(--border);
@@ -1731,8 +1966,8 @@ html.scroll-lock { overflow: hidden; }
     width: 76px;
   }
   .brand-name, .nav-label, .profile-text, .profile-info, .sidebar-create .btn-label { display: none; }
-  .sidebar__logo-card { min-height: 48px; padding: 4px; max-width: 52px; }
-  .sidebar__logo { max-height: 36px; }
+  .sidebar__logo-card, .ping-brand__logo-frame { min-height: 48px; width: 48px; height: 48px; padding: 4px; border-radius: 10px; }
+  .sidebar__logo, .ping-brand__logo { max-height: 36px; }
   .sidebar-create { width: 44px; padding: 0; }
   .nav-list, .sidebar__navigation { justify-items: center; }
   .nav-item { width: 44px; height: 44px; padding: 0; justify-content: center; }
@@ -1746,14 +1981,23 @@ html.scroll-lock { overflow: hidden; }
 @media (max-width: 699px) {
   .app,
   .ping-shell,
-  .app-shell {
+  .app-shell,
+  .ping-app {
     display: block;
     padding: 0;
   }
-  .sidebar, .ping-nav { display: none; }
-  .main, .ping-main, .main-content {
+  .ping-content-grid,
+  .content-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ping-workspace,
+  .workspace {
     padding: 16px;
     padding-bottom: calc(72px + var(--space-6) + env(safe-area-inset-bottom));
+  }
+  .sidebar, .ping-nav, .ping-sidebar { display: none; }
+  .main, .ping-main, .main-content {
+    padding: 0;
   }
   .ads-below { display: none; }
   .ad-inline { display: flex; justify-content: center; }
