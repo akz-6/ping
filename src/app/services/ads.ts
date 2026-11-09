@@ -372,20 +372,46 @@ export class GoogleAdSenseProvider implements AdProvider {
 
     container.append(ins);
 
+    const triggerFallback = () => {
+      observer.disconnect();
+      if (!container.isConnected) return;
+      this.fallbackProvider.render(container, size);
+    };
+
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === "attributes") {
+          const status = ins.getAttribute("data-ad-status");
+          if (status === "unfilled") {
+            triggerFallback();
+            return;
+          }
+          if (status === "filled") {
+            observer.disconnect();
+            return;
+          }
+        }
+      }
+    });
+
+    observer.observe(ins, { attributes: true, attributeFilter: ["data-ad-status", "data-adsbygoogle-status"] });
+
     try {
       ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-      // Anti-branco & Anti-adblock: Se em 1200ms o Google AdSense não tiver renderizado conteúdo
-      // ou se tiver ficado sem preenchimento / bloqueado, faz o fallback gracioso para o banner do PING
+      // Anti-branco & Anti-adblock: Se em 1800ms o Google AdSense não tiver preenchido anúncio
+      // (status 'unfilled' ou pendente de aprovação do publisher), renderiza o banner direto do PING
       window.setTimeout(() => {
-        if (!container.isConnected) return;
-        const iframe = ins.querySelector("iframe");
-        const unfilled = ins.getAttribute("data-ad-status") === "unfilled";
-        if (unfilled || !iframe || iframe.offsetHeight === 0) {
-          this.fallbackProvider.render(container, size);
+        if (!container.isConnected) {
+          observer.disconnect();
+          return;
         }
-      }, 1200);
+        const status = ins.getAttribute("data-ad-status");
+        if (status !== "filled") {
+          triggerFallback();
+        }
+      }, 1800);
     } catch {
-      this.fallbackProvider.render(container, size);
+      triggerFallback();
     }
   }
 }

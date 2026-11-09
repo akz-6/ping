@@ -1195,6 +1195,12 @@ iframe[name^="google_ads_iframe"] {
   color-scheme: dark !important;
 }
 
+/* Garante que o iframe do Google nunca mostre tela branca enquanto carrega ou se não preenchido */
+ins.adsbygoogle:not([data-ad-status="filled"]) iframe {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
 .ad-creative {
   display: flex;
   flex-direction: column;
