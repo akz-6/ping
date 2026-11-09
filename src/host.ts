@@ -154,166 +154,363 @@ function formatLimitation(reason: QualityLimitationReason | undefined): string {
 }
 
 const TEMPLATE = `
-<main class="shell">
-  <header class="brand"><span class="dot"></span> Ping <a href="/" class="host-back-link">← Voltar às salas</a></header>
+<main class="shell ping-host-studio studio">
+  <header class="studio-header brand">
+    <div class="studio-room-info">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="studio-brand-title">PING STUDIO</span>
+      <span class="studio-badge-config" id="header-config-badge">Configuração</span>
+      <span class="live-badge header-live-pill" id="header-live-badge" hidden>
+        <span class="pulse-dot"></span> AO VIVO
+      </span>
+      <h1 class="studio-heading-title" id="studio-heading-title">Configure sua transmissão</h1>
+    </div>
+    <div class="studio-header-actions">
+      <span class="viewer-counter muted" id="header-viewer-count" hidden>0 espectadores</span>
+      <a href="/" class="host-back-link">← Voltar às salas</a>
+    </div>
+  </header>
 
-  <section class="card" id="setup">
-    <h1>Compartilhe sua tela com os amigos</h1>
-    <p class="muted">O vídeo vai direto do seu computador para o navegador deles (P2P). Quem assiste não instala nada.</p>
-
-    <div class="grid">
-      <label>Taxa de quadros
-        <select id="fps">
-          <option value="30">30 FPS</option>
-          <option value="60" selected>60 FPS (Padrão)</option>
-          <option value="120">120 FPS (Ultra Gamer)</option>
-          <option value="144">144 FPS (Competitivo)</option>
-          <option value="240">240 FPS (Extremo)</option>
-        </select>
-      </label>
-      <label>Resolução
-        <select id="res">
-          <option value="720">720p</option>
-          <option value="1080" selected>1080p</option>
-          <option value="1440">1440p</option>
-          <option value="2160">4K</option>
-        </select>
-      </label>
-      <label>Bitrate máx. por espectador
-        <select id="br">
-          <option value="4000">4 Mbps</option>
-          <option value="8000" selected>8 Mbps</option>
-          <option value="12000">12 Mbps</option>
-          <option value="20000">20 Mbps</option>
-        </select>
-      </label>
-      <label>Tipo de conteúdo
-        <select id="hint">
-          <option value="motion" selected>Jogo / vídeo (prioriza fluidez)</option>
-          <option value="detail">Texto / slides (prioriza nitidez)</option>
-        </select>
-      </label>
+  <!-- EXPERIÊNCIA 1: CONFIGURAÇÃO DE TRANSMISSÃO -->
+  <section class="card setup-card-container" id="setup">
+    <div class="setup-header">
+      <h2>Configure sua transmissão</h2>
+      <p class="muted">Defina a qualidade, o áudio e quem poderá assistir.</p>
     </div>
 
-    <details class="advanced" id="advanced">
-      <summary>Opções avançadas de vídeo, rede e acesso</summary>
-      <div class="grid advanced-grid">
-        <label>Preferência de codec
-          <select id="codec">
-            <option value="h264" selected>H.264 → VP9 → AV1 → VP8 (Hardware acelerado - Recomendado)</option>
-            <option value="vp9">VP9 → AV1 → H.264 → VP8 (Alta compressão)</option>
-            <option value="av1">AV1 → VP9 → H.264 → VP8</option>
-            <option value="vp8">VP8 → H.264 → VP9 → AV1 (Compatibilidade)</option>
-          </select>
-        </label>
-        <label>Controle de bitrate
-          <select id="bitrate-mode">
-            <option value="fixed" selected>Fixo (mantém teto configurado - recomendado)</option>
-            <option value="adaptive">Adaptativo (reduz teto apenas sob perda real)</option>
-          </select>
-        </label>
-        <label>Meu upload em Mbps
-          <input type="number" id="upload-mbps" min="1" max="10000" step="1" value="50" />
-        </label>
-        <label>Máximo de espectadores
-          <select id="max-viewers">
-            <option value="1">1 pessoa (Mais leve para sua internet)</option>
-            <option value="2">2 pessoas</option>
-            <option value="3" selected>3 pessoas (Padrão recomendado)</option>
-            <option value="4">4 pessoas</option>
-            <option value="5">5 pessoas</option>
-            <option value="6">6 pessoas</option>
-            <option value="7">7 pessoas</option>
-            <option value="8">8 pessoas (Exige internet rápida)</option>
-            <option value="10">10 pessoas (Exige fibra potente)</option>
-            <option value="12">12 pessoas (Fibra de alta velocidade)</option>
-          </select>
-        </label>
-        <label>Senha da sala (opcional)
-          <input type="password" id="room-password" placeholder="Em branco = sem senha" autocomplete="off" />
-        </label>
-      </div>
-      <label class="check advanced-check"><input type="checkbox" id="require-approval" /> Exigir aprovação manual para cada espectador</label>
-    </details>
-
-    <label class="check"><input type="checkbox" id="audio" checked /> Capturar áudio do sistema ou da aba</label>
-    <div class="turn-hint ${hasTurn() ? "turn-ready" : "turn-missing"}" role="status">
-      ${hasTurn()
-        ? '<span>🛡️ <strong>TURN ativo:</strong> Conexões externas e redes móveis (4G/5G) habilitadas.</span>'
-        : '<span>⚠️ <strong>Aviso de Rede:</strong> TURN não configurado. Funciona na mesma rede/Wi-Fi. Conexões em 4G/5G ou CGNAT exigem servidor TURN.</span>'}
-    </div>
-    <p class="muted screen-share-tip">💡 <strong>Dica contra tela preta:</strong> Para transmitir jogos, Discord, Spotify ou navegadores sem tela preta, compartilhe <strong>Tela inteira</strong> ou desative a aceleração de hardware no app compartilhado.</p>
-    <div id="p2p-human-warning" class="p2p-human-tip" role="status"></div>
-    <p class="warn" id="setup-capacity-warn" role="status" hidden></p>
-    <button id="start" type="button" class="primary">Iniciar transmissão</button>
-    <p class="warn" id="unsupported" hidden>Este navegador não consegue compartilhar a tela. Use Chrome, Edge ou Firefox no computador. Quem só assiste pode usar qualquer navegador.</p>
-  </section>
-
-  <section class="card" id="live" hidden>
-    <div class="palco-layout palco-layout-host" id="host-palco">
-      <div class="palco-stage">
-        <div class="preview-wrap">
-          <video id="preview" muted autoplay playsinline aria-label="Pré-visualização da tela capturada"></video>
-          <div class="discord-live-pill"><span class="pulse-dot"></span> AO VIVO</div>
-          <div id="host-paused-overlay" class="paused-overlay" hidden>
-            <span>⏸️ Transmissão Pausada</span>
+    <div class="setup-layout-grid">
+      <!-- Coluna Principal: Formulário Temático -->
+      <div class="setup-main-col">
+        <div class="setup-cards-grid">
+          <!-- Card 1: Qualidade -->
+          <div class="setup-card" data-card="quality">
+            <div class="setup-card__head">
+              <div class="setup-card__icon-wrap">
+                <svg class="setup-card__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                  <line x1="8" y1="21" x2="16" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+              </div>
+              <div class="setup-card__titles">
+                <h3>Qualidade</h3>
+                <p>FPS, resolução e bitrate.</p>
+              </div>
+            </div>
+            <div class="setup-card__body grid">
+              <label for="fps">Taxa de quadros
+                <select id="fps">
+                  <option value="30">30 FPS</option>
+                  <option value="60" selected>60 FPS (Padrão)</option>
+                  <option value="120">120 FPS (Ultra Gamer)</option>
+                  <option value="144">144 FPS (Competitivo)</option>
+                  <option value="240">240 FPS (Extremo)</option>
+                </select>
+              </label>
+              <label for="res">Resolução
+                <select id="res">
+                  <option value="720">720p</option>
+                  <option value="1080" selected>1080p</option>
+                  <option value="1440">1440p</option>
+                  <option value="2160">4K</option>
+                </select>
+              </label>
+              <label for="br">Bitrate máx. por espectador
+                <select id="br">
+                  <option value="4000">4 Mbps</option>
+                  <option value="8000" selected>8 Mbps</option>
+                  <option value="12000">12 Mbps</option>
+                  <option value="20000">20 Mbps</option>
+                </select>
+              </label>
+              <label for="hint">Tipo de conteúdo
+                <select id="hint">
+                  <option value="motion" selected>Jogo / vídeo (prioriza fluidez)</option>
+                  <option value="detail">Texto / slides (prioriza nitidez)</option>
+                </select>
+              </label>
+            </div>
           </div>
-          <div id="host-stopped-overlay" class="stopped-overlay" hidden>
-            <div class="stopped-box">
-              <p class="stopped-title">⏹️ Transmissão Parada</p>
-              <p class="muted stopped-desc">A sala continua aberta com o mesmo link para os seus amigos!</p>
-              <button id="btn-resume-live" type="button" class="primary sm resume-live-btn">▶️ Iniciar Transmissão</button>
+
+          <!-- Card 2: Acesso -->
+          <div class="setup-card" data-card="access">
+            <div class="setup-card__head">
+              <div class="setup-card__icon-wrap">
+                <svg class="setup-card__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+              </div>
+              <div class="setup-card__titles">
+                <h3>Acesso</h3>
+                <p>Senha e aprovação.</p>
+              </div>
+            </div>
+            <div class="setup-card__body">
+              <label for="room-password">Senha da sala (opcional)
+                <input type="password" id="room-password" placeholder="Em branco = sem senha" autocomplete="off" />
+              </label>
+              <label class="check advanced-check">
+                <input type="checkbox" id="require-approval" />
+                <span>Exigir aprovação manual para cada espectador</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Card 3: Áudio -->
+          <div class="setup-card" data-card="audio">
+            <div class="setup-card__head">
+              <div class="setup-card__icon-wrap">
+                <svg class="setup-card__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+              </div>
+              <div class="setup-card__titles">
+                <h3>Áudio</h3>
+                <p>Captura do sistema ou aba.</p>
+              </div>
+            </div>
+            <div class="setup-card__body">
+              <label class="check">
+                <input type="checkbox" id="audio" checked />
+                <span>Capturar áudio do sistema ou da aba</span>
+              </label>
+              <p class="field-help-text muted">Transmita o som do seu jogo, Discord ou computador diretamente para os espectadores.</p>
+            </div>
+          </div>
+
+          <!-- Card 4: Espectadores -->
+          <div class="setup-card" data-card="viewers">
+            <div class="setup-card__head">
+              <div class="setup-card__icon-wrap">
+                <svg class="setup-card__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+              </div>
+              <div class="setup-card__titles">
+                <h3>Espectadores</h3>
+                <p>Limite e permissões.</p>
+              </div>
+            </div>
+            <div class="setup-card__body">
+              <label for="max-viewers">Máximo de pessoas simultâneas
+                <select id="max-viewers">
+                  <option value="1">1 pessoa (Mais leve para sua internet)</option>
+                  <option value="2">2 pessoas</option>
+                  <option value="3" selected>3 pessoas (Padrão recomendado)</option>
+                  <option value="4">4 pessoas</option>
+                  <option value="5">5 pessoas</option>
+                  <option value="6">6 pessoas</option>
+                  <option value="7">7 pessoas</option>
+                  <option value="8">8 pessoas (Exige internet rápida)</option>
+                  <option value="10">10 pessoas (Exige fibra potente)</option>
+                  <option value="12">12 pessoas (Fibra de alta velocidade)</option>
+                </select>
+              </label>
             </div>
           </div>
         </div>
-        <div class="row">
-          <input id="link" readonly aria-label="Link da sala" />
-          <button id="copy" type="button" class="primary">Copiar link</button>
-        </div>
-        <div class="row live-toolbar">
-          <button id="change-source" type="button" class="btn-discord-tool" title="Trocar janela ou tela compartilhada">🖥️ Trocar Tela</button>
-          <button id="pause-stream" type="button" class="btn-discord-tool" title="Pausar ou retomar vídeo da transmissão">⏸️ Pausar Tela</button>
-          <button id="stop-stream" type="button" class="btn-discord-tool" title="Parar transmissão da live mantendo a sala e o link abertos">⏹️ Parar Live</button>
-          <button id="mute-audio" type="button" class="btn-discord-tool" title="Silenciar ou ativar áudio da transmissão">🔊 Áudio Ativo</button>
-        </div>
-        <div class="row live-room-settings">
-          <button id="btn-toggle-visibility" type="button" class="btn-discord-pill" title="Alternar se a sala aparece ou não no lobby de salas">👁️ Sala Visível no Lobby</button>
-          <button id="btn-change-password" type="button" class="btn-discord-pill" title="Alterar ou definir a senha desta sala">🔑 Alterar Senha</button>
-          <button id="btn-remove-password" type="button" class="btn-discord-pill" title="Remover a senha e deixar a sala aberta para todos">🔓 Tirar Senha</button>
-        </div>
-        <div class="row between">
-          <div class="live-meta">
-            <span id="count" class="muted" role="status" aria-live="polite">0 espectadores</span>
-            <span id="capacity-info" class="muted"></span>
+
+        <!-- Seção de opções avançadas (acordeão fechado inicialmente) -->
+        <details class="advanced ping-details" id="advanced">
+          <summary class="ping-summary">Opções avançadas de vídeo, rede e acesso</summary>
+          <div class="grid advanced-grid">
+            <label for="codec">Preferência de codec
+              <select id="codec">
+                <option value="h264" selected>H.264 → VP9 → AV1 → VP8 (Hardware acelerado - Recomendado)</option>
+                <option value="vp9">VP9 → AV1 → H.264 → VP8 (Alta compressão)</option>
+                <option value="av1">AV1 → VP9 → H.264 → VP8</option>
+                <option value="vp8">VP8 → H.264 → VP9 → AV1 (Compatibilidade)</option>
+              </select>
+            </label>
+            <label for="bitrate-mode">Controle de bitrate
+              <select id="bitrate-mode">
+                <option value="fixed" selected>Fixo (mantém teto configurado - recomendado)</option>
+                <option value="adaptive">Adaptativo (reduz teto apenas sob perda real)</option>
+              </select>
+            </label>
+            <label for="upload-mbps">Meu upload em Mbps
+              <input type="number" id="upload-mbps" min="1" max="10000" step="1" value="50" />
+            </label>
           </div>
-          <button id="stop" type="button" class="danger">Encerrar</button>
+        </details>
+
+        <!-- Status de conexão e dicas em blocos compactos -->
+        <div class="turn-hint ${hasTurn() ? "turn-ready" : "turn-missing"}" role="status">
+          ${hasTurn()
+            ? '<span>🛡️ <strong>TURN ativo:</strong> Conexões externas e redes móveis (4G/5G) habilitadas.</span>'
+            : '<span>⚠️ <strong>Aviso de Rede:</strong> TURN não configurado. Funciona na mesma rede/Wi-Fi. Conexões em 4G/5G ou CGNAT exigem servidor TURN.</span>'}
         </div>
-        <p class="warn" id="capacity-warn" role="status" hidden></p>
-        <div id="pending-wrap" class="pending-wrap" role="region" aria-label="Solicitações de entrada pendentes" hidden>
-          <p class="pending-title">Aguardando aprovação</p>
-          <div id="pending-list" class="pending-list"></div>
+        <details class="setup-help-tip">
+          <summary class="muted">💡 <strong>Dica contra tela preta:</strong> clique para ver detalhes</summary>
+          <p class="muted screen-share-tip">Para transmitir jogos, Discord, Spotify ou navegadores sem tela preta, compartilhe <strong>Tela inteira</strong> ou desative a aceleração de hardware no app compartilhado.</p>
+        </details>
+        <div id="p2p-human-warning" class="p2p-human-tip" role="status"></div>
+        <p class="warn" id="setup-capacity-warn" role="status" hidden></p>
+        <p class="warn" id="unsupported" hidden>Este navegador não consegue compartilhar a tela. Use Chrome, Edge ou Firefox no computador. Quem só assiste pode usar qualquer navegador.</p>
+      </div>
+
+      <!-- Coluna Secundária: Resumo e Início -->
+      <aside class="setup-summary-col">
+        <div class="summary-card">
+          <div class="summary-card__header">
+            <h3>Resumo da transmissão</h3>
+          </div>
+          <div class="summary-card__list">
+            <div class="summary-item">
+              <span class="summary-label">Resolução</span>
+              <strong class="summary-value" id="sum-res">1080p</strong>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Quadros</span>
+              <strong class="summary-value" id="sum-fps">60 FPS</strong>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Bitrate máximo</span>
+              <strong class="summary-value" id="sum-br">8 Mbps</strong>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Conteúdo</span>
+              <strong class="summary-value" id="sum-hint">Jogo / Vídeo</strong>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Espectadores</span>
+              <strong class="summary-value" id="sum-viewers">3 pessoas</strong>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Áudio</span>
+              <strong class="summary-value" id="sum-audio">Ativado</strong>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Acesso</span>
+              <strong class="summary-value" id="sum-access">Público</strong>
+            </div>
+          </div>
+          <button id="start" type="button" class="primary btn-start-broadcast">
+            <span class="live-pulse-text">((•))</span> INICIAR TRANSMISSÃO
+          </button>
         </div>
-        <div id="stats-wrap" class="stats-wrap" hidden>
-          <table class="stats-table" aria-label="Estatísticas por espectador">
-            <thead>
-              <tr>
-                <th>Espectador</th>
-                <th>Codec</th>
-                <th>Bitrate</th>
-                <th>FPS</th>
-                <th>RTT</th>
-                <th>Limitação</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="stats-body"></tbody>
-          </table>
+      </aside>
+    </div>
+  </section>
+
+  <!-- EXPERIÊNCIA 2: STUDIO DO ORGANIZADOR -->
+  <section class="card studio-live-container" id="live" hidden>
+    <div class="studio-main-grid" id="host-palco">
+      <!-- Linha Superior: Stage de Vídeo (Esquerda) + Chat ao Vivo (Direita) -->
+      <div class="studio-top-row palco-layout palco-layout-host">
+        <div class="studio-stage-column palco-stage">
+          <!-- Palco do Vídeo / Prévia -->
+          <div class="stream-stage preview-wrap">
+            <video id="preview" muted autoplay playsinline aria-label="Pré-visualização da tela capturada" class="stream-stage__video"></video>
+            <div class="discord-live-pill stream-stage__overlay"><span class="pulse-dot"></span> AO VIVO</div>
+            <div class="stream-stage__placeholder" id="preview-placeholder">
+              <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2" class="stream-stage__placeholder-icon">
+                <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"></polygon>
+              </svg>
+              <span class="stream-stage__placeholder-text">PRÉVIA DA TRANSMISSÃO</span>
+            </div>
+            <div id="host-paused-overlay" class="paused-overlay" hidden>
+              <span>⏸️ Transmissão Pausada</span>
+            </div>
+            <div id="host-stopped-overlay" class="stopped-overlay" hidden>
+              <div class="stopped-box">
+                <p class="stopped-title">⏹️ Transmissão Parada</p>
+                <p class="muted stopped-desc">A sala continua aberta com o mesmo link para os seus amigos!</p>
+                <button id="btn-resume-live" type="button" class="primary sm resume-live-btn">▶️ Iniciar Transmissão</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resumo de Métricas (Pills) -->
+          <div class="diagnostic-summary live-meta">
+            <span id="count" class="metric-pill metric-pill--online" role="status" aria-live="polite">0 espectadores</span>
+            <span id="metric-fps" class="metric-pill">60 FPS</span>
+            <span id="metric-bitrate" class="metric-pill">8,0 Mbps</span>
+            <span id="metric-rtt" class="metric-pill">1 ms RTT</span>
+            <span id="capacity-info" class="metric-pill muted"></span>
+          </div>
+          <p class="warn" id="capacity-warn" role="status" hidden></p>
         </div>
-        <div class="row between live-actions">
-          <button id="copy-diag" type="button" class="sm" title="Copiar diagnóstico técnico em JSON">Copiar diagnóstico (JSON)</button>
+
+        <!-- Coluna do Chat ao Vivo -->
+        <aside class="studio-chat palco-chat-col" id="host-chat-mount"></aside>
+      </div>
+
+      <!-- Linha Compartilhar Link -->
+      <div class="share-url row">
+        <input id="link" readonly aria-label="Link da sala" />
+        <button id="copy" type="button" class="primary">Copiar link</button>
+      </div>
+
+      <!-- Card de Controles da Transmissão (2x2 Grid) -->
+      <div class="studio-controls">
+        <div class="studio-controls__header">
+          <h3>Controles da transmissão</h3>
+        </div>
+        <div class="control-group">
+          <span class="control-label">TRANSMISSÃO</span>
+          <div class="control-actions live-toolbar">
+            <button id="change-source" type="button" class="btn-discord-tool" title="Trocar janela ou tela compartilhada">🖥️ Trocar Tela</button>
+            <button id="pause-stream" type="button" class="btn-discord-tool" title="Pausar ou retomar vídeo da transmissão">⏸️ Pausar Tela</button>
+            <button id="mute-audio" type="button" class="btn-discord-tool" title="Silenciar ou ativar áudio da transmissão">🔊 Áudio Ativo</button>
+            <button id="btn-toggle-visibility" type="button" class="btn-discord-tool" title="Alternar visibilidade no lobby">👁️ Visibilidade</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">ACESSO À SALA</span>
+          <div class="control-actions live-room-settings">
+            <button id="stop-stream" type="button" class="btn-discord-pill" title="Parar transmissão da live mantendo a sala e o link abertos">⏹️ Parar Live</button>
+            <button id="btn-change-password" type="button" class="btn-discord-pill" title="Alterar ou definir a senha desta sala">🔑 Alterar Senha</button>
+            <button id="btn-remove-password" type="button" class="btn-discord-pill" title="Remover a senha e deixar a sala aberta para todos">🔓 Tirar Senha</button>
+          </div>
+        </div>
+
+        <div class="studio-danger-zone">
+          <button id="stop" type="button" class="danger">Encerrar transmissão</button>
         </div>
       </div>
-      <div id="host-chat-mount"></div>
+
+      <!-- Seção Expansível: Espectadores e Diagnóstico -->
+      <details class="studio-diagnostics" id="diag-accordion" open>
+        <summary class="studio-diagnostics__summary">
+          <div class="diag-header-text">
+            <h3>Gerenciamento de espectadores</h3>
+            <p class="muted">Lista, codec, bitrate, FPS, RTT e ações administrativas em painel expansível.</p>
+          </div>
+          <div class="diag-summary-right">
+            <button id="copy-diag" type="button" class="btn-discord-pill sm" title="Copiar diagnóstico técnico em JSON">Copiar diagnóstico (JSON)</button>
+            <span class="badge-connected" id="diag-viewer-badge">0 conectados</span>
+          </div>
+        </summary>
+        <div class="diagnostic-details">
+          <div id="pending-wrap" class="pending-wrap" role="region" aria-label="Solicitações de entrada pendentes" hidden>
+            <p class="pending-title">Aguardando aprovação</p>
+            <div id="pending-list" class="pending-list"></div>
+          </div>
+          <div id="stats-wrap" class="stats-wrap" hidden>
+            <table class="stats-table" aria-label="Estatísticas por espectador">
+              <thead>
+                <tr>
+                  <th>Espectador</th>
+                  <th>Codec</th>
+                  <th>Bitrate</th>
+                  <th>FPS</th>
+                  <th>RTT</th>
+                  <th>Limitação</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="stats-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
     </div>
   </section>
 </main>
@@ -369,6 +566,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   const stopBtn = $<HTMLButtonElement>(root, "#stop");
   const copyBtn = $<HTMLButtonElement>(root, "#copy");
   const preview = $<HTMLVideoElement>(root, "#preview");
+  const previewPlaceholder = root.querySelector<HTMLElement>("#preview-placeholder");
   const linkInput = $<HTMLInputElement>(root, "#link");
   const countEl = $<HTMLElement>(root, "#count");
   const capacityInfoEl = $<HTMLElement>(root, "#capacity-info");
@@ -396,6 +594,46 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   const changePasswordBtn = $<HTMLButtonElement>(root, "#btn-change-password");
   const removePasswordBtn = $<HTMLButtonElement>(root, "#btn-remove-password");
   const hostBackLink = root.querySelector<HTMLAnchorElement>(".host-back-link");
+  const fpsSelect = $<HTMLSelectElement>(root, "#fps");
+  const resSelect = $<HTMLSelectElement>(root, "#res");
+  const hintSelect = $<HTMLSelectElement>(root, "#hint");
+  const audioInput = $<HTMLInputElement>(root, "#audio");
+  const metricFps = root.querySelector<HTMLElement>("#metric-fps");
+  const metricBitrate = root.querySelector<HTMLElement>("#metric-bitrate");
+  const metricRtt = root.querySelector<HTMLElement>("#metric-rtt");
+  const diagViewerBadge = root.querySelector<HTMLElement>("#diag-viewer-badge");
+  const headerLiveBadge = root.querySelector<HTMLElement>("#header-live-badge");
+  const headerConfigBadge = root.querySelector<HTMLElement>("#header-config-badge");
+  const headerViewerCount = root.querySelector<HTMLElement>("#header-viewer-count");
+  const studioHeadingTitle = root.querySelector<HTMLElement>("#studio-heading-title");
+
+  const sumRes = root.querySelector<HTMLElement>("#sum-res");
+  const sumFps = root.querySelector<HTMLElement>("#sum-fps");
+  const sumBr = root.querySelector<HTMLElement>("#sum-br");
+  const sumHint = root.querySelector<HTMLElement>("#sum-hint");
+  const sumViewers = root.querySelector<HTMLElement>("#sum-viewers");
+  const sumAudio = root.querySelector<HTMLElement>("#sum-audio");
+  const sumAccess = root.querySelector<HTMLElement>("#sum-access");
+
+  const updateSetupSummary = (): void => {
+    if (sumRes) sumRes.textContent = `${resSelect.value}p`;
+    if (sumFps) sumFps.textContent = `${fpsSelect.value} FPS`;
+    if (sumBr) sumBr.textContent = `${Number(brSelect.value) / 1000} Mbps`;
+    if (sumHint) sumHint.textContent = hintSelect.value === "motion" ? "Jogo / Vídeo" : "Texto / Detalhes";
+    if (sumViewers) sumViewers.textContent = `${maxViewersInput.value} ${Number(maxViewersInput.value) === 1 ? "pessoa" : "pessoas"}`;
+    if (sumAudio) sumAudio.textContent = audioInput.checked ? "Ativado" : "Desativado";
+    if (sumAccess) sumAccess.textContent = passwordInput.value ? "Protegido por senha" : "Público";
+  };
+
+  fpsSelect.addEventListener("change", updateSetupSummary);
+  resSelect.addEventListener("change", updateSetupSummary);
+  brSelect.addEventListener("change", updateSetupSummary);
+  hintSelect.addEventListener("change", updateSetupSummary);
+  maxViewersInput.addEventListener("change", updateSetupSummary);
+  audioInput.addEventListener("change", updateSetupSummary);
+  passwordInput.addEventListener("input", updateSetupSummary);
+  updateSetupSummary();
+
   let isStreamPaused = false;
   let isAudioMuted = false;
   let isLiveActive = true;
@@ -614,9 +852,19 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   };
 
   const renderStatsTable = (): void => {
+    if (diagViewerBadge) {
+      diagViewerBadge.textContent = `${viewers.size} ${viewers.size === 1 ? "conectado" : "conectados"}`;
+    }
+    if (headerViewerCount) {
+      headerViewerCount.textContent = `${viewers.size} ${viewers.size === 1 ? "espectador" : "espectadores"}`;
+    }
+
     if (viewers.size === 0) {
       statsWrap.hidden = true;
       statsBody.replaceChildren();
+      if (metricFps) metricFps.textContent = `${fpsSelect.value} FPS`;
+      if (metricBitrate) metricBitrate.textContent = `${(activeBitrateKbps / 1000).toFixed(1).replace(".", ",")} Mbps`;
+      if (metricRtt) metricRtt.textContent = `— ms RTT`;
       return;
     }
 
@@ -690,6 +938,26 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
         cells[5].title = "";
       }
     }
+
+    let totalBitrate = 0;
+    let totalFps = 0;
+    let totalRtt = 0;
+    let countWithStats = 0;
+    for (const entry of viewers.values()) {
+      const s = entry.lastStats;
+      if (s) {
+        totalBitrate += (s.kbps ?? 0);
+        totalFps += (s.fps ?? 0);
+        if (s.rttMs !== null) totalRtt += s.rttMs;
+        countWithStats++;
+      }
+    }
+    const avgFps = countWithStats > 0 ? Math.round(totalFps / countWithStats) : Number(fpsSelect.value);
+    const avgBitrateMbps = countWithStats > 0 ? (totalBitrate / countWithStats / 1000).toFixed(1) : (activeBitrateKbps / 1000).toFixed(1);
+    const avgRtt = countWithStats > 0 ? Math.round(totalRtt / countWithStats) : 1;
+    if (metricFps) metricFps.textContent = `${avgFps} FPS`;
+    if (metricBitrate) metricBitrate.textContent = `${avgBitrateMbps.replace(".", ",")} Mbps`;
+    if (metricRtt) metricRtt.textContent = `${avgRtt} ms RTT`;
   };
 
   uploadInput.addEventListener("input", () => {
@@ -757,6 +1025,8 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   const broadcastCount = (): void => {
     const n = viewers.size;
     countEl.textContent = n === 1 ? "1 espectador" : `${n} espectadores`;
+    if (headerViewerCount) headerViewerCount.textContent = `${n} ${n === 1 ? "espectador" : "espectadores"}`;
+    if (diagViewerBadge) diagViewerBadge.textContent = `${n} ${n === 1 ? "conectado" : "conectados"}`;
     hostLifecycle?.syncViewers(n);
     for (const { conn } of viewers.values()) send(conn, { t: "viewers", n });
     updateCapacityUi();
@@ -901,10 +1171,16 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     muteAudioBtn.textContent = "🔊 Áudio Ativo";
     muteAudioBtn.classList.remove("active");
     preview.srcObject = null;
+    if (previewPlaceholder) previewPlaceholder.hidden = false;
     linkInput.value = "";
     live.hidden = true;
     setup.hidden = false;
     startBtn.disabled = false;
+    if (headerConfigBadge) headerConfigBadge.hidden = false;
+    if (headerLiveBadge) headerLiveBadge.hidden = true;
+    if (headerViewerCount) headerViewerCount.hidden = true;
+    if (studioHeadingTitle) studioHeadingTitle.textContent = "Configure sua transmissão";
+    updateSetupSummary();
   };
 
   const stopLive = (): void => {
@@ -920,6 +1196,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       currentVideoTrack = null;
     }
     preview.srcObject = null;
+    if (previewPlaceholder) previewPlaceholder.hidden = false;
     hostStoppedOverlay.hidden = false;
     stopStreamBtn.textContent = "▶️ Iniciar Live";
     stopStreamBtn.classList.add("active");
@@ -982,6 +1259,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
 
     hostStoppedOverlay.hidden = true;
     preview.srcObject = stream;
+    if (previewPlaceholder) previewPlaceholder.hidden = true;
     const tryResumePlay = () => { void preview.play().catch(() => undefined); };
     tryResumePlay();
     preview.onloadedmetadata = tryResumePlay;
@@ -1133,9 +1411,15 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       linkInput.value = `${location.origin}/?room=${openedId}`;
       setup.hidden = true;
       live.hidden = false;
+      window.scrollTo(0, 0);
+      if (headerConfigBadge) headerConfigBadge.hidden = true;
+      if (headerLiveBadge) headerLiveBadge.hidden = false;
+      if (headerViewerCount) headerViewerCount.hidden = false;
+      if (studioHeadingTitle) studioHeadingTitle.textContent = "Minha transmissão";
       hostStoppedOverlay.hidden = true;
       hostPausedOverlay.hidden = true;
       preview.srcObject = stream;
+      if (previewPlaceholder) previewPlaceholder.hidden = true;
       const tryHostPlay = () => { void preview.play().catch(() => undefined); };
       tryHostPlay();
       preview.onloadedmetadata = tryHostPlay;
@@ -1749,6 +2033,7 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
 
       stream = newStream;
       preview.srcObject = newStream;
+      if (previewPlaceholder) previewPlaceholder.hidden = true;
       void preview.play().catch(() => undefined);
       toast("Fonte de vídeo alterada com sucesso!");
     } catch {
@@ -1797,7 +2082,8 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
   });
 
   const copyDiagBtn = $<HTMLButtonElement>(root, "#copy-diag");
-  copyDiagBtn.addEventListener("click", async () => {
+  copyDiagBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
     const opts = readOptions();
     const track = currentVideoTrack;
     const diagData = {

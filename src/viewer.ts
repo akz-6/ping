@@ -70,7 +70,13 @@ function formatDeniedMessage(reason: DeniedReason | undefined): string {
 }
 
 const TEMPLATE = `
-<main class="viewer ping-stage" id="stage" aria-label="Reprodutor da transmissão" data-chat="visible" data-theater="false">
+<main class="viewer ping-stage viewer-room" id="stage" aria-label="Reprodutor da transmissão" data-chat="visible" data-theater="false">
+  <header class="viewer-header">
+    <a href="/" class="btn-back-lobby btn-viewer-back" title="Voltar ao início">← Voltar às salas</a>
+    <div class="viewer-live-badge-wrap">
+      <span class="discord-live-pill"><span class="pulse-dot"></span> AO VIVO</span>
+    </div>
+  </header>
   <div class="palco-layout ping-stage__frame" id="palco">
     <div class="palco-stage ping-stage__player" id="stage-inner">
       <video id="v" autoplay playsinline muted></video>

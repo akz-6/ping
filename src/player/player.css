@@ -5,7 +5,8 @@
 .viewer,
 .viewer.ping-stage {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
@@ -18,7 +19,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--chat-w);
   width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   max-height: none;
   aspect-ratio: auto;
   background: var(--bg-stage);
@@ -120,32 +122,47 @@
   display: none !important;
 }
 
-/* Big play central, circular e discreto */
+/* Big play central, circular e discreto (Screenshot C) */
 .video-js.ping-skin .vjs-big-play-button {
   top: 50%;
   left: 50%;
   margin: 0;
-  width: 84px;
-  height: 84px;
-  line-height: 80px;
+  width: 76px;
+  height: 76px;
+  line-height: 74px;
   transform: translate(-50%, -50%);
-  border: 1px solid var(--border-strong);
+  border: 2px solid var(--red);
   border-radius: var(--radius-full);
-  background: rgb(18 18 20 / 0.78);
-  backdrop-filter: blur(8px);
-  color: var(--text);
-  font-size: 3.2em;
+  background: var(--red);
+  box-shadow: 0 0 24px var(--red-glow);
+  color: var(--white);
+  font-size: 2.8em;
   padding: 0;
   transition: transform var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .video-js.ping-skin:hover .vjs-big-play-button,
 .video-js.ping-skin .vjs-big-play-button:focus {
-  transform: translate(-50%, -50%) scale(1.06);
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
+  transform: translate(-50%, -50%) scale(1.08);
+  background: var(--red-hover);
+  border-color: var(--red-hover);
+  color: var(--white);
 }
-.video-js.ping-skin .vjs-big-play-button .vjs-icon-placeholder::before { line-height: 80px; }
+.video-js.ping-skin .vjs-big-play-button .vjs-icon-placeholder::before { line-height: 74px; }
+.video-js.ping-skin .vjs-big-play-button::after {
+  content: "PLAYER DE TRANSMISSÃO";
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  white-space: nowrap;
+  text-transform: uppercase;
+  pointer-events: none;
+}
 
 /* Barra de controle */
 .video-js .vjs-control-bar[hidden],
