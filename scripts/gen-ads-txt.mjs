@@ -7,7 +7,32 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const adsTxtPath = path.join(rootDir, "public", "ads.txt");
 
-const rawClientId = process.env.VITE_ADSENSE_CLIENT_ID || "";
+let rawClientId = process.env.VITE_ADSENSE_CLIENT_ID || "";
+
+// Se não estiver no process.env, tenta ler do .env.local ou .env
+if (!rawClientId) {
+  for (const envFile of [".env.local", ".env"]) {
+    const envPath = path.join(rootDir, envFile);
+    if (fs.existsSync(envPath)) {
+      try {
+        const content = fs.readFileSync(envPath, "utf-8");
+        const match = content.match(/VITE_ADSENSE_CLIENT_ID=["']?([^"'\r\n]+)["']?/);
+        if (match && match[1]) {
+          rawClientId = match[1].trim();
+          break;
+        }
+      } catch {
+        // ignore read error
+      }
+    }
+  }
+}
+
+// Fallback padrão para o publisher ID do projeto
+if (!rawClientId) {
+  rawClientId = "ca-pub-1425612838019230";
+}
+
 let pubId = rawClientId.trim();
 
 if (pubId) {

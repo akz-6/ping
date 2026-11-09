@@ -36,6 +36,19 @@
       ]
     },
     {
+      "source": "/(privacy|terms|contact).html",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Permissions-Policy", "value": "display-capture=(self)" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://pagead2.googlesyndication.com https://*.google.com https://*.doubleclick.net; style-src 'self'; font-src 'self' data:; img-src 'self' data: blob: https://cdn.discordapp.com https://*.google.com https://*.doubleclick.net; media-src 'self' blob: mediastream:; connect-src 'self' https: wss: http: ws: https://pagead2.googlesyndication.com https://*.google.com https://*.doubleclick.net; frame-src 'self' https://googleads.g.doubleclick.net https://*.google.com https://*.doubleclick.net; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },

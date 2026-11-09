@@ -27,17 +27,21 @@ test.describe("Fase L4 — Anúncios Obrigatórios, Aviso LGPD e Qualidade", () 
     const consentVal = await page.evaluate(() => localStorage.getItem("ping:cookie_consent"));
     expect(consentVal).toBe("accepted");
 
-    const sponsorLink = page.locator(".ad-creative").first();
-    await expect(sponsorLink).toBeVisible();
-    await expect(sponsorLink).toHaveAttribute("target", "_blank");
-    await expect(sponsorLink).toHaveAttribute("rel", "sponsored noopener");
-    await expect(sponsorLink.getByText(/Patrocinado/i).first()).toBeVisible();
+    const adElement = page.locator(".ad-creative, ins.adsbygoogle").first();
+    await expect(adElement).toBeVisible();
+    if (await page.locator(".ad-creative").count() > 0) {
+      await expect(adElement).toHaveAttribute("target", "_blank");
+      await expect(adElement).toHaveAttribute("rel", "sponsored noopener");
+      await expect(adElement.getByText(/Patrocinado/i).first()).toBeVisible();
+    } else {
+      await expect(adElement).toHaveAttribute("data-ad-client");
+    }
   });
 
   test("anúncios são exibidos de forma obrigatória no Lobby mesmo na primeira visita", async ({ page }) => {
     await page.goto("/");
-    const sponsorLink = page.locator(".ad-creative").first();
-    await expect(sponsorLink).toBeVisible();
+    const adElement = page.locator(".ad-creative, ins.adsbygoogle").first();
+    await expect(adElement).toBeVisible();
     await expect(page.locator(".ad-optout")).toHaveCount(0);
   });
 
@@ -79,6 +83,7 @@ test.describe("Fase L4 — Anúncios Obrigatórios, Aviso LGPD e Qualidade", () 
 
     await expect(page.locator(".ad-slot")).toHaveCount(0);
     await expect(page.locator(".ad-creative")).toHaveCount(0);
+    await expect(page.locator("ins.adsbygoogle")).toHaveCount(0);
     await expect(page.locator("#ping-consent-banner")).toHaveCount(0);
     await expect(page.locator(".ads-right")).toHaveCount(0);
     await expect(page.locator(".ads-below")).toHaveCount(0);
