@@ -46,35 +46,48 @@ export function SidebarNav(opts: {
   );
 
   const initialName = opts.displayName || opts.handle;
-  const avatarWrap = h("span", { class: "profile-avatar-wrap" }, Avatar(initialName, 36, opts.avatarUrl));
+  const avatarWrap = h("span", { class: "profile-avatar-wrap" }, Avatar(initialName, 40, opts.avatarUrl));
   const nameEl = h("span", { class: "profile-name" }, initialName);
   const badgeEl = h("span", { class: "profile-badge" }, "Anônimo");
   const profileBtn = h(
     "button",
     {
       type: "button",
-      class: "profile-card",
+      class: "profile-card sidebar__profile",
       "aria-label": `Abrir perfil de ${initialName}`,
       onClick: () => opts.onNavigate("profile"),
     },
     avatarWrap,
-    h("span", { class: "profile-text" }, nameEl, badgeEl),
+    h("span", { class: "profile-text profile-info" }, nameEl, badgeEl),
   );
 
   const el = h(
     "aside",
-    { class: "sidebar" },
+    { class: "sidebar ping-nav" },
     h(
       "div",
-      { class: "brand-row" },
-      h("span", { class: "live-dot", "aria-hidden": "true" }),
-      h("span", { class: "brand-name" }, "Ping"),
+      { class: "sidebar__brand brand-row ping-logo" },
+      h(
+        "div",
+        { class: "sidebar__logo-card" },
+        h("img", {
+          src: "/branding/ping-logo.png",
+          alt: "PING",
+          class: "sidebar__logo",
+        }),
+      ),
+      h(
+        "div",
+        { class: "sidebar__brand-text" },
+        h("span", { class: "brand-name ping-brand" }, "Ping"),
+        h("span", { class: "live-dot", "aria-hidden": "true" }),
+      ),
     ),
     h(
       "button",
       {
         type: "button",
-        class: "btn btn-primary btn-block sidebar-create",
+        class: "btn btn-primary btn-block sidebar-create button button--primary sidebar__create",
         id: "sidebar-create",
         "aria-label": "Criar sala",
         onClick: () => opts.onNavigate("create"),
@@ -82,7 +95,7 @@ export function SidebarNav(opts: {
       icon("plus", 16),
       h("span", { class: "btn-label" }, "Criar Sala"),
     ),
-    h("nav", { class: "nav-list", "aria-label": "Principal" }, ...items),
+    h("nav", { class: "nav-list sidebar__navigation", "aria-label": "Principal" }, ...items),
     profileBtn,
   );
 
@@ -94,7 +107,7 @@ export function SidebarNav(opts: {
     avatarUrl?: string;
   }) => {
     profileBtn.setAttribute("aria-label", `Abrir perfil de ${p.displayName}`);
-    avatarWrap.replaceChildren(Avatar(p.displayName, 36, p.avatarUrl));
+    avatarWrap.replaceChildren(Avatar(p.displayName, 40, p.avatarUrl));
     nameEl.textContent = p.displayName;
     if (p.discordLinked) {
       profileBtn.setAttribute("data-verified", "true");
@@ -124,8 +137,13 @@ export function SidebarNav(opts: {
     setActive(id) {
       items.forEach((b) => {
         const on = b.dataset.nav === id;
-        if (on) b.setAttribute("aria-current", "page");
-        else b.removeAttribute("aria-current");
+        if (on) {
+          b.setAttribute("aria-current", "page");
+          b.classList.add("nav-item--active");
+        } else {
+          b.removeAttribute("aria-current");
+          b.classList.remove("nav-item--active");
+        }
       });
     },
     updateProfile,
@@ -265,8 +283,62 @@ export function SearchInput(onChange: (query: string) => void): HTMLElement {
   };
   document.addEventListener("keydown", onGlobalKey);
 
-  const wrap = h("div", { class: "search", role: "search" }, icon("search", 18), input, kbd, clear);
+  const wrap = h("div", { class: "search search-box", role: "search" }, icon("search", 18), input, kbd, clear);
   return wrap;
+}
+
+/* ---------- Hero Banner da Tela Inicial ---------- */
+export function LobbyHero(opts: {
+  onCreate: () => void;
+  onExplore: () => void;
+}): HTMLElement {
+  return h(
+    "section",
+    { class: "lobby-hero hero" },
+    h(
+      "div",
+      { class: "lobby-hero__badge" },
+      h("img", {
+        src: "/branding/ping-logo.png",
+        alt: "PING",
+        class: "lobby-hero__logo",
+      }),
+    ),
+    h(
+      "div",
+      { class: "lobby-hero__content" },
+      h("h1", { class: "lobby-hero__title" }, "Sua gameplay. Sua sala. Sua galera."),
+      h(
+        "p",
+        { class: "lobby-hero__desc" },
+        "Crie salas, compartilhe sua tela e conecte-se com seus amigos.",
+      ),
+      h(
+        "div",
+        { class: "lobby-hero__actions" },
+        h(
+          "button",
+          {
+            type: "button",
+            class: "btn btn-primary button button--primary",
+            onClick: opts.onCreate,
+          },
+          icon("plus", 16),
+          h("span", {}, "Criar Sala"),
+        ),
+        h(
+          "button",
+          {
+            type: "button",
+            class: "btn btn-secondary button button--secondary",
+            onClick: opts.onExplore,
+          },
+          icon("search", 16),
+          h("span", {}, "Explorar Salas"),
+        ),
+      ),
+    ),
+  );
 }
 
 /* ---------- AdSlot (re-exportado do serviço especializado de anúncios) ---------- */
@@ -291,7 +363,7 @@ export function Banner(
     { class: `banner banner-${kind}`, role: kind === "error" ? "alert" : "status" },
     h("span", {}, text),
     action
-      ? h("button", { type: "button", class: "btn btn-secondary btn-sm", onClick: action.onClick }, action.label)
+      ? h("button", { type: "button", class: "btn btn-secondary btn-sm button button--secondary", onClick: action.onClick }, action.label)
       : null,
   );
 }
@@ -303,11 +375,20 @@ export function EmptyState(
 ): HTMLElement {
   return h(
     "div",
-    { class: "empty" },
-    h("p", { class: "empty-title" }, title),
+    { class: "empty empty-state" },
+    h(
+      "div",
+      { class: "empty-state__logo-wrap" },
+      h("img", {
+        src: "/branding/ping-logo.png",
+        alt: "PING",
+        class: "empty-state__logo",
+      }),
+    ),
+    h("h2", { class: "empty-title" }, title),
     h("p", { class: "empty-text" }, text),
     action
-      ? h("button", { type: "button", class: "btn btn-primary", onClick: action.onClick }, action.label)
+      ? h("button", { type: "button", class: "btn btn-primary button button--primary", onClick: action.onClick }, action.label)
       : null,
   );
 }

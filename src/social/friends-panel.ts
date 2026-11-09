@@ -41,12 +41,14 @@ export function mountFriendsPanel(opts: FriendsPanelOptions): () => void {
 
     const form = document.createElement('form');
     form.className = 'friends__add';
+    form.setAttribute('data-action', 'add-friend');
     const input = document.createElement('input');
     input.type = 'text';
-    input.placeholder = 'Adicionar por @usuário do Discord';
-    input.setAttribute('aria-label', 'Usuário do Discord');
+    input.name = 'username';
+    input.placeholder = 'Adicionar por @usuário';
+    input.setAttribute('aria-label', 'Username do amigo');
     input.maxLength = 40;
-    const add = button('Adicionar', 'btn btn--sm', 'submit');
+    const add = button('Adicionar', 'btn btn--sm button button--secondary', 'submit');
     form.append(input, add);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -83,7 +85,7 @@ export function mountFriendsPanel(opts: FriendsPanelOptions): () => void {
     }
 
     const toggle = document.createElement('label');
-    toggle.className = 'switch-row';
+    toggle.className = 'switch-row activity-setting';
     const text = div('switch-row__text');
     text.textContent = 'Mostrar minha atividade';
     const small = document.createElement('small');
@@ -91,6 +93,7 @@ export function mountFriendsPanel(opts: FriendsPanelOptions): () => void {
     text.appendChild(small);
     const cb = document.createElement('input');
     cb.type = 'checkbox';
+    cb.name = 'showActivity';
     cb.checked = snap?.settings.showActivity ?? true;
     cb.addEventListener('change', async () => {
       const res = await service.setShowActivity(cb.checked);

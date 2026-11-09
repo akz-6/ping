@@ -326,6 +326,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
     },
     onFpsChange: (fps) => setFpsChoice(String(fps), true),
     onOpenStats: () => toggleStatsModal(),
+    onCloseStats: () => { discordStatsModal.hidden = true; },
     onChatToggle: () => {
       chatUi.toggleChat();
       container.dataset.chat = chatUi.isChatOpen() ? "visible" : "hidden";
@@ -1143,6 +1144,12 @@ export function mountViewer(root: HTMLElement, room: string): void {
   });
 
   const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === "Escape" && !discordStatsModal.hidden) {
+      e.preventDefault();
+      discordStatsModal.hidden = true;
+      showBarTemporarily();
+      return;
+    }
     if (finished || bar.hidden) return;
     if (e.ctrlKey || e.altKey || e.metaKey) return;
     const target = e.target as HTMLElement | null;

@@ -9,6 +9,7 @@ import {
   BottomNav,
   Banner,
   EmptyState,
+  LobbyHero,
   RoomCard,
   RoomCardSkeleton,
   SearchInput,
@@ -57,7 +58,7 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
   let query = "";
   let view: "lobby" | "host" = "lobby";
 
-  const feed = h("div", { class: "feed" });
+  const feed = h("div", { class: "feed rooms-section" });
   document.title = "Ping — Salas ao Vivo";
   const live = h("p", { class: "sr-only", role: "status", "aria-live": "polite" });
   const lobby = h("section", { class: "lobby" });
@@ -211,10 +212,19 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
     render();
   });
 
+  const hero = LobbyHero({
+    onCreate,
+    onExplore: () => {
+      const input = search.querySelector<HTMLInputElement>(".search-input");
+      input?.focus();
+      feed.scrollIntoView({ behavior: "smooth" });
+    },
+  });
+
   function section(title: string, list: Room[], opts: { chip?: string; skeletons: number; counter: { n: number } }): HTMLElement {
-    const head = h("div", { class: "section-head" }, h("h2", { class: "section-title" }, title));
+    const head = h("div", { class: "section-head section-header" }, h("h2", { class: "section-title" }, title));
     if (opts.chip) head.append(h("span", { class: "chip" }, opts.chip));
-    const items = h("div", { class: "room-list" });
+    const items = h("div", { class: "room-list rooms-container" });
 
     if (status === "loading") {
       for (let i = 0; i < opts.skeletons; i++) items.append(RoomCardSkeleton());
@@ -234,6 +244,13 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
     feed.replaceChildren();
     const q = normalize(query);
     const match = (r: Room): boolean => !q || normalize(r.name).includes(q) || normalize(r.host).includes(q);
+
+    // Oculta o Hero caso o usuário esteja pesquisando para focar nos resultados
+    if (q) {
+      hero.hidden = true;
+    } else {
+      hero.hidden = false;
+    }
 
     if (status === "error") {
       feed.append(
@@ -295,9 +312,9 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
 
   const lobbyFooter = h(
     "footer",
-    { class: "lobby-footer", role: "contentinfo" },
+    { class: "lobby-footer footer", role: "contentinfo" },
     h(
-      "div",
+      "nav",
       { class: "lobby-footer-links" },
       h("a", { href: "/privacy.html", class: "lobby-footer-link" }, "Privacidade"),
       h("span", { class: "lobby-footer-sep", "aria-hidden": "true" }, "•"),
@@ -308,27 +325,28 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
     h(
       "p",
       { class: "lobby-footer-copy" },
-      "Ping © 2026 — Transmissão WebRTC peer-to-peer de alta performance.",
+      "PING © 2026 — Transmissão WebRTC peer-to-peer de alta performance.",
     ),
   );
 
   lobby.append(
     h(
       "div",
-      { class: "m-header" },
+      { class: "m-header topbar" },
       h("span", { class: "live-dot", "aria-hidden": "true" }),
       h("span", { class: "brand-name" }, "Ping"),
     ),
     search,
+    hero,
     live,
     feed,
     lobbyFooter,
   );
 
-  const main = h("main", { class: "main", id: "main" }, lobby, hostView);
+  const main = h("main", { class: "main main-content", id: "main" }, lobby, hostView);
   const adsRight = h(
     "aside",
-    { class: "ads-right ping-rail", "aria-label": "Painel Lateral e Amigos" },
+    { class: "ads-right ping-rail friends-panel-container", "aria-label": "Painel Lateral e Amigos" },
     friendsContainer,
     AdSlot("300x250"),
     AdSlot("300x600"),
@@ -336,7 +354,7 @@ export function mountApp(root: HTMLElement, options?: { initialView?: "lobby" | 
   const adsBelow = h("aside", { class: "ads-below", "aria-label": "Publicidade" }, AdSlot("300x250"));
   main.append(adsBelow);
 
-  root.replaceChildren(h("div", { class: "app" }, sidebar.el, main, adsRight, bottom));
+  root.replaceChildren(h("div", { class: "app ping-shell app-shell" }, sidebar.el, main, adsRight, bottom));
   setActive("rooms");
   void load();
 

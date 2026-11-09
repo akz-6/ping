@@ -1,34 +1,62 @@
-/* Ping v2: fonte única de tokens. Nenhum outro arquivo define cor em hexadecimal. */
+/* Ping: fonte única de tokens de design. Nenhum outro arquivo define cor em hexadecimal. */
 :root,
 :root[data-theme="dark"] {
+  /* Cores principais da identidade PING Gaming / Esports */
   --bg: #09090b;
+  --bg-secondary: #101114;
   --bg-stage: #000000;
-  --surface-1: #121214;
-  --surface-2: #18181b;
-  --surface-3: #222227;
-  --surface-4: #27272a;
-  --control: #1f1f22;
-  --border: #27272a;
-  --border-strong: #3f3f46;
-  --text: #fafafa;
-  --text-2: #c4c4cc;
-  --text-muted: #8b8b95;
-  --text-faint: #71717a;
-  --accent: #ffffff;
-  --accent-fg: #09090b;
-  --accent-hover: #e4e4e7;
-  --primary-bg: #ffffff;
-  --primary-fg: #09090b;
-  --primary-hover: #e4e4e7;
-  --live: #22c55e;
-  --live-glow: rgb(34 197 94 / 0.45);
+  --surface: #15161a;
+  --surface-1: #15161a;
+  --surface-2: #18191e;
+  --surface-3: #202126;
+  --surface-4: #292a30;
+  --surface-hover: #202126;
+  --surface-active: #292a30;
+
+  --control: #18191e;
+  --border: #292a30;
+  --border-strong: #3f4048;
+  --border-active: #e52532;
+
+  /* Vermelho PING */
+  --red: #e52532;
+  --red-hover: #ff3542;
+  --red-dark: #b81722;
+  --red-soft: rgb(229 37 50 / 0.12);
+  --red-glow: rgb(229 37 50 / 0.35);
+
+  --primary: #e52532;
+  --primary-bg: #e52532;
+  --primary-fg: #ffffff;
+  --primary-hover: #ff3542;
+  --primary-dark: #b81722;
+
+  --accent: #e52532;
+  --accent-fg: #ffffff;
+  --accent-hover: #ff3542;
+
+  --white: #ffffff;
+  --text: #ffffff;
+  --text-1: #ffffff;
+  --text-2: #b4b4bb;
+  --text-secondary: #b4b4bb;
+  --text-muted: #777982;
+  --text-3: #777982;
+  --text-faint: #5a5c64;
+
+  --online: #25c76a;
+  --live: #25c76a;
+  --live-glow: rgb(37 199 106 / 0.45);
+  --offline: #777777;
+  --warning: #ffc247;
+  --danger: #e52532;
+  --danger-soft: rgb(229 37 50 / 0.14);
+
   --discord: #5865f2;
   --discord-hover: #4752c4;
   --on-color: #ffffff;
-  --danger: #ef4444;
-  --danger-soft: rgb(239 68 68 / 0.14);
-  --overlay: rgb(0 0 0 / 0.66);
-  --scrim-bottom: linear-gradient(to top, rgb(0 0 0 / 0.86), rgb(0 0 0 / 0));
+  --overlay: rgb(0 0 0 / 0.72);
+  --scrim-bottom: linear-gradient(to top, rgb(0 0 0 / 0.88), rgb(0 0 0 / 0));
 
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -49,20 +77,27 @@
   --space-8: 32px;
   --space-12: 48px;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-sm: 9px;
+  --radius-md: 14px;
+  --radius-lg: 19px;
   --radius-full: 999px;
 
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --dur-fast: 120ms;
   --dur: 200ms;
+  --transition: 180ms ease;
 
-  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--border-strong);
-  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.5);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--red);
+  --shadow-sm: 0 4px 12px rgb(0 0 0 / 0.2);
+  --shadow-card: 0 12px 36px rgb(0 0 0 / 0.28);
+  --shadow-pop: 0 16px 44px rgb(0 0 0 / 0.6);
+  --shadow-primary: 0 6px 20px rgb(229 37 50 / 0.25);
 
-  --nav-w: 220px;
-  --rail-w: 320px;
+  --sidebar-width: 248px;
+  --friends-width: 280px;
+  --max-content-width: 1680px;
+  --nav-w: 248px;
+  --rail-w: 280px;
   --chat-w: 340px;
   --chat-width: 340px;
   --header-h: 56px;
@@ -72,20 +107,16 @@
   --z-toast: 200;
 
   /* Aliases semânticos para compatibilidade total */
-  --card: var(--surface-2);
-  --card-bg: var(--surface-2);
-  --text-1: var(--text);
-  --text-3: var(--text-muted);
-  --primary: var(--accent);
-  --on-primary: var(--accent-fg);
+  --card: var(--surface-1);
+  --card-bg: var(--surface-1);
+  --on-primary: var(--primary-fg);
   --open-fg: var(--live);
-  --open-bg: rgb(34 197 94 / 0.15);
+  --open-bg: rgb(37 199 106 / 0.15);
   --closed-fg: var(--text-2);
   --closed-bg: var(--surface-3);
   --border-hover: var(--border-strong);
-  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.5);
-  --shadow-card-hover: 0 4px 12px rgb(0 0 0 / 0.7);
-  --shadow-modal: 0 16px 40px rgb(0 0 0 / 0.8);
+  --shadow-card-hover: 0 8px 24px rgb(0 0 0 / 0.45);
+  --shadow-modal: 0 20px 48px rgb(0 0 0 / 0.85);
   --motion: var(--dur);
   --radius-card: var(--radius-lg);
   --radius-control: var(--radius-md);
@@ -98,54 +129,87 @@
   --fs-caption: 12px;
   --fs-overline: 11px;
 
-  /* Cores determinísticas de avatar Black + Gray */
-  --avatar-c0-bg: #27272a;
-  --avatar-c0-fg: #fafafa;
-  --avatar-c1-bg: #3f3f46;
-  --avatar-c1-fg: #fafafa;
-  --avatar-c2-bg: #52525b;
-  --avatar-c2-fg: #fafafa;
-  --avatar-c3-bg: #18181b;
-  --avatar-c3-fg: #fafafa;
-  --avatar-c4-bg: #2e2e33;
-  --avatar-c4-fg: #fafafa;
-  --avatar-c5-bg: #38383e;
-  --avatar-c5-fg: #fafafa;
+  /* Cores determinísticas de avatar */
+  --avatar-c0-bg: #292a30;
+  --avatar-c0-fg: #ffffff;
+  --avatar-c1-bg: #3f4048;
+  --avatar-c1-fg: #ffffff;
+  --avatar-c2-bg: #52535d;
+  --avatar-c2-fg: #ffffff;
+  --avatar-c3-bg: #18191e;
+  --avatar-c3-fg: #ffffff;
+  --avatar-c4-bg: #202126;
+  --avatar-c4-fg: #ffffff;
+  --avatar-c5-bg: #b81722;
+  --avatar-c5-fg: #ffffff;
 
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
   --bg: #fafafa;
+  --bg-secondary: #f4f4f5;
   --bg-stage: #000000;
+  --surface: #ffffff;
   --surface-1: #ffffff;
   --surface-2: #f4f4f5;
   --surface-3: #e4e4e7;
   --surface-4: #d4d4d8;
+  --surface-hover: #ececee;
+  --surface-active: #e4e4e7;
+
   --control: #e4e4e7;
   --border: #e4e4e7;
   --border-strong: #a1a1aa;
+  --border-active: #e52532;
+
+  --red: #e52532;
+  --red-hover: #ff3542;
+  --red-dark: #b81722;
+  --red-soft: rgb(229 37 50 / 0.12);
+  --red-glow: rgb(229 37 50 / 0.35);
+
+  --primary: #e52532;
+  --primary-bg: #e52532;
+  --primary-fg: #ffffff;
+  --primary-hover: #ff3542;
+  --primary-dark: #b81722;
+
+  --accent: #e52532;
+  --accent-fg: #ffffff;
+  --accent-hover: #ff3542;
+
+  --white: #ffffff;
   --text: #09090b;
+  --text-1: #09090b;
   --text-2: #3f3f46;
+  --text-secondary: #3f3f46;
   --text-muted: #62626b;
+  --text-3: #62626b;
   --text-faint: #a1a1aa;
-  --accent: #09090b;
-  --accent-fg: #fafafa;
-  --accent-hover: #27272a;
-  --primary-bg: #09090b;
-  --primary-fg: #fafafa;
-  --primary-hover: #27272a;
-  --primary: var(--accent);
-  --on-primary: var(--accent-fg);
+
+  --online: #25c76a;
+  --live: #25c76a;
+  --live-glow: rgb(37 199 106 / 0.45);
+  --offline: #777777;
+  --warning: #ffc247;
+  --danger: #e52532;
+  --danger-soft: rgb(229 37 50 / 0.14);
+
+  --discord: #5865f2;
+  --discord-hover: #4752c4;
+  --on-color: #ffffff;
   --card: var(--surface-1);
   --card-bg: var(--surface-1);
-  --text-1: var(--text);
-  --text-3: var(--text-muted);
-  --overlay: rgb(0 0 0 / 0.4);
-  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.16);
-  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.08);
-  --shadow-card-hover: 0 4px 12px rgb(0 0 0 / 0.12);
-  --shadow-modal: 0 16px 40px rgb(0 0 0 / 0.2);
+  --on-primary: var(--primary-fg);
+  --overlay: rgb(0 0 0 / 0.45);
+  --shadow-sm: 0 4px 12px rgb(0 0 0 / 0.08);
+  --shadow-card: 0 8px 24px rgb(0 0 0 / 0.08);
+  --shadow-pop: 0 16px 40px rgb(0 0 0 / 0.16);
+  --shadow-primary: 0 6px 20px rgb(229 37 50 / 0.25);
+  --shadow-card-hover: 0 12px 28px rgb(0 0 0 / 0.12);
+  --shadow-modal: 0 20px 48px rgb(0 0 0 / 0.22);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--red);
   color-scheme: light;
 }
 
@@ -153,6 +217,7 @@
   :root {
     --dur-fast: 0ms;
     --dur: 0ms;
+    --transition: 0ms;
   }
   *,
   *::before,
@@ -160,5 +225,6 @@
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
   }
 }

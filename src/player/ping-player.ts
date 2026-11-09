@@ -24,6 +24,7 @@ export interface PingPlayerOptions {
   onQualityCycle?: () => void;
   onFpsChange?: (fps: "auto" | number) => void;
   onOpenStats?: () => void;
+  onCloseStats?: () => void;
   onChatToggle?: () => void;
   onTheaterChange?: () => void;
   onMuteToggle?: () => void;
@@ -257,6 +258,11 @@ export class PingPlayer {
       case "d": {
         e.preventDefault();
         opts.onOpenStats?.();
+        break;
+      }
+      case "escape": {
+        e.preventDefault();
+        opts.onCloseStats?.();
         break;
       }
       case "c": {
