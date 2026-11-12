@@ -27,6 +27,8 @@ import {
   createViewerTransport,
   type ViewerTransport,
 } from "./transport";
+import { MobileDock } from "./viewer/mobile/mobile-dock";
+import { MobileSheets } from "./viewer/mobile/mobile-sheets";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BACKOFF_MS = [1000, 2000, 3000, 5000, 8000];
@@ -197,11 +199,18 @@ export function mountViewer(root: HTMLElement, room: string): void {
   let currentPreset: QualityPreset = "source";
   let hostMaxFps = 60;
   let currentFpsChoice: string = "auto";
+  let currentUnreadCount = 0;
   let osdTimer: number | undefined;
   let activeViewerTransport: ViewerTransport | null = null;
   let currentTransportMode: "p2p" | "sfu" = "p2p";
 
   let pingPlayer: PingPlayer;
+  let mobileDock: MobileDock;
+  let mobileSheets: MobileSheets;
+  const clientId = shortId(8);
+  let peer: Peer | null = null;
+  let conn: DataConnection | null = null;
+  let currentCall: MediaConnection | null = null;
 
   const showOsd = (text: string): void => {
     pingPlayer?.showToast(text);
@@ -240,6 +249,8 @@ export function mountViewer(root: HTMLElement, room: string): void {
       showOsd(`Qualidade: ${PRESET_LABELS[preset]}`);
     }
     pingPlayer?.setQuality(preset);
+    mobileDock?.syncQuality(preset);
+    mobileSheets?.setQuality(preset);
   };
 
   const setFpsChoice = (choice: string, notify = true): void => {
@@ -261,6 +272,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
       showOsd(choice === "auto" ? `FPS: Auto (${hostMaxFps} FPS)` : `FPS limitado a: ${choice} FPS`);
     }
     pingPlayer?.setFps(choice === "auto" ? "auto" : Number(choice));
+    mobileSheets?.setFps(choice, hostMaxFps, [240, 144, 120, 60, 30, 15].filter((f) => f <= hostMaxFps));
   };
 
   const toggleMute = (): void => {
@@ -286,6 +298,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
     const fsBtnEl = root.querySelector<HTMLButtonElement>("#fs");
     fsBtnEl?.classList.toggle("active", expanded);
     fsBtnEl?.setAttribute("aria-pressed", String(expanded));
+    mobileDock?.syncFullscreen(expanded);
     showOsd(expanded ? "📱 Tela expandida" : "📱 Janela normal");
   };
 
@@ -347,13 +360,17 @@ export function mountViewer(root: HTMLElement, room: string): void {
     onToggleChange: (isOpen) => {
       palcoLayout.classList.toggle("chat-hidden", !isOpen);
       pingPlayer?.setChatActive(isOpen);
+      mobileDock?.syncChat(isOpen, currentUnreadCount);
     },
     onUnreadChange: (count) => {
+      currentUnreadCount = count;
       pingPlayer?.setChatUnread(count);
+      mobileDock?.syncChat(chatUi.isChatOpen(), count);
     },
   });
   chatMount.replaceWith(chatUi.getElement());
   palcoLayout.classList.toggle("chat-hidden", !chatUi.isChatOpen());
+  container.dataset.chat = chatUi.isChatOpen() ? "visible" : "hidden";
 
   pingPlayer = new PingPlayer(video, {
     onQualityChange: (preset) => setQualityPreset(preset, true),
@@ -381,6 +398,45 @@ export function mountViewer(root: HTMLElement, room: string): void {
     },
   });
   pingPlayer.setChatActive(chatUi.isChatOpen());
+
+  mobileSheets = new MobileSheets({
+    root: container,
+    onSelectQuality: (preset) => setQualityPreset(preset, true),
+    onSelectFps: (fpsChoice) => setFpsChoice(fpsChoice, true),
+    onCopyDiagnostics: () => copyDiagBtn.click(),
+  });
+
+  mobileDock = new MobileDock({
+    container,
+    headerEl: $<HTMLElement>(root, ".viewer-header"),
+    palcoLayout,
+    stageEl: $<HTMLElement>(root, "#stage-inner"),
+    videoEl: video,
+    room,
+    onToggleAudio: () => {
+      toggleMute();
+      showOsd(video.muted ? "🔇 Silenciado" : "🔊 Áudio ativado");
+    },
+    onToggleChat: () => {
+      chatUi.toggleChat();
+      container.dataset.chat = chatUi.isChatOpen() ? "visible" : "hidden";
+    },
+    onToggleFullscreen: () => {
+      toggleFullscreen();
+      showBarTemporarily();
+    },
+    onOpenQuality: () => mobileSheets.open("quality"),
+    onOpenStats: () => mobileSheets.open("stats"),
+    onToggleFit: () => {
+      const zBtn = root.querySelector<HTMLButtonElement>("#zoom-btn");
+      zBtn?.click();
+      const playerWrap = root.querySelector(".video-js.ping-skin");
+      mobileDock.syncFit(Boolean(playerWrap?.classList.contains("is-cover-mode")));
+    },
+  });
+  mobileDock.syncChat(chatUi.isChatOpen(), currentUnreadCount);
+  mobileDock.syncQuality(currentPreset);
+  mobileDock.syncAudio(video.muted || video.volume === 0);
 
   const osdEl = $<HTMLElement>(root, "#osd");
   const bar = $<HTMLElement>(root, "#bar");
@@ -452,6 +508,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
       dsChosenFps.textContent = `Auto (${maxFps} FPS)`;
     }
     pingPlayer?.setHostMaxFps(maxFps);
+    mobileSheets?.setFps(fpsSelect.value, maxFps, allowedTiers);
   };
 
   fpsSelect.addEventListener("change", () => {
@@ -465,6 +522,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
   const syncSoundUi = (): void => {
     const isMuted = video.muted || video.volume === 0;
     soundBtn.textContent = isMuted ? "Ativar som" : "Silenciar";
+    mobileDock?.syncAudio(isMuted);
   };
   video.addEventListener("volumechange", syncSoundUi);
 
@@ -514,10 +572,6 @@ export function mountViewer(root: HTMLElement, room: string): void {
     return;
   }
 
-  const clientId = shortId(8);
-  let peer: Peer | null = null;
-  let conn: DataConnection | null = null;
-  let currentCall: MediaConnection | null = null;
   let detachCallListeners: (() => void) | null = null;
   let detachConnListeners: (() => void) | null = null;
   let savedPwHash: string | undefined;
@@ -653,6 +707,8 @@ export function mountViewer(root: HTMLElement, room: string): void {
     discordStatsModal.hidden = true;
     video.srcObject = null;
     pingPlayer?.showState("stopped", msg);
+    mobileDock?.setStreamState(isError ? "failed" : "ended");
+    mobileSheets?.close();
     setStatus(msg, isError);
   };
 
@@ -671,6 +727,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
 
     reconnectAttempt += 1;
     const delay = BACKOFF_MS[reconnectAttempt - 1] ?? 8000;
+    mobileDock?.setStreamState("reconnecting", `Reconectando (${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})`);
     setStatus(
       `Conexão perdida. Reconectando (tentativa ${reconnectAttempt} de ${MAX_RECONNECT_ATTEMPTS})…`,
       false,
@@ -878,6 +935,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
 
           case "pause": {
             pauseOverlay.hidden = !msg.paused;
+            mobileDock?.setStreamState(msg.paused ? "paused" : "live");
             showOsd(msg.paused ? "⏸️ Transmissão pausada pelo anfitrião" : "▶️ Transmissão retomada");
             break;
           }
@@ -904,6 +962,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
           }
 
           case "viewers":
+            mobileDock?.setViewerCount(msg.n);
             break;
         }
       });
@@ -950,6 +1009,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
       statusEl.hidden = true;
       bar.hidden = false;
       liveBadge.hidden = false;
+      mobileDock?.setStreamState("live");
       showBarTemporarily();
     };
 
@@ -986,9 +1046,11 @@ export function mountViewer(root: HTMLElement, room: string): void {
           }
           if (gotStream) {
             statusEl.hidden = true;
+            mobileDock?.setStreamState("live");
           }
         } else if (state === "disconnected") {
           setStatus("Conexão instável. Tentando recuperar…");
+          mobileDock?.setStreamState("unstable", "Instável");
           if (iceDisconnectTimer === undefined) {
             iceDisconnectTimer = window.setTimeout(() => {
               iceDisconnectTimer = undefined;
@@ -1038,6 +1100,20 @@ export function mountViewer(root: HTMLElement, room: string): void {
               dsFps.textContent = `${s.fps} FPS`;
               dsCodec.textContent = s.diagnostic.codec || "VP9";
             }
+            mobileSheets?.updateStats({
+              connectionLabel: qLabel,
+              connectionLevel: s.quality,
+              resolution: s.width > 0 ? `${s.width}×${s.height}` : "—",
+              fps: `${s.fps} FPS`,
+              bitrate: `${(s.kbps / 1000).toFixed(1)} Mbps`,
+              rtt: s.rttMs === null ? "—" : `${Math.round(s.rttMs)} ms`,
+              codec: s.diagnostic.codec || "VP9",
+              transport: currentTransportMode === "sfu" ? "SFU (Cloudflare)" : "WebRTC P2P",
+              packetLoss:
+                typeof s.diagnostic.packetsLost === "number"
+                  ? `${s.diagnostic.packetsLost} pacotes`
+                  : "0 pacotes",
+            });
           }, 1000);
         }
       });
@@ -1290,6 +1366,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
     const isFs = Boolean(document.fullscreenElement);
     fsBtn?.classList.toggle("active", isFs);
     fsBtn?.setAttribute("aria-pressed", String(isFs));
+    mobileDock?.syncFullscreen(isFs);
     if (!isFs) {
       unlockOrientation();
     }
@@ -1301,6 +1378,8 @@ export function mountViewer(root: HTMLElement, room: string): void {
 
   function onBeforeUnload(): void {
     document.removeEventListener("fullscreenchange", onFullscreenChange);
+    mobileDock?.destroy();
+    mobileSheets?.destroy();
     if (finished) return;
     terminate("Conexão encerrada.", false);
     pingPlayer?.dispose();
