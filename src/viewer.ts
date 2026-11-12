@@ -280,24 +280,57 @@ export function mountViewer(root: HTMLElement, room: string): void {
     syncSoundUi();
   };
 
+  const setMobileExpanded = (expanded: boolean): void => {
+    container.classList.toggle("mobile-expanded", expanded);
+    container.dataset.expanded = String(expanded);
+    const fsBtnEl = root.querySelector<HTMLButtonElement>("#fs");
+    fsBtnEl?.classList.toggle("active", expanded);
+    fsBtnEl?.setAttribute("aria-pressed", String(expanded));
+    showOsd(expanded ? "📱 Tela expandida" : "📱 Janela normal");
+  };
+
+  const unlockOrientation = (): void => {
+    try {
+      (screen.orientation as { unlock?: () => void } | undefined)?.unlock?.();
+    } catch {
+      // ignore
+    }
+  };
+
   const toggleFullscreen = (): void => {
+    if (container.classList.contains("mobile-expanded")) {
+      setMobileExpanded(false);
+      unlockOrientation();
+      return;
+    }
+
     if (document.fullscreenElement) {
       void document.exitFullscreen().catch(() => undefined);
+      unlockOrientation();
       return;
     }
-    if (typeof container.requestFullscreen === "function") {
-      void container.requestFullscreen().catch(() => {
-        const webkitVideo = video as HTMLVideoElement & {
-          webkitEnterFullscreen?: () => void;
-        };
-        webkitVideo.webkitEnterFullscreen?.();
-      });
+
+    const isTouch =
+      window.matchMedia?.("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
+    if (typeof container.requestFullscreen === "function" && document.fullscreenEnabled !== false) {
+      void container
+        .requestFullscreen()
+        .then(() => {
+          if (isTouch) {
+            void (
+              screen.orientation as { lock?: (o: string) => Promise<void> } | undefined
+            )?.lock?.("landscape").catch(() => undefined);
+          }
+        })
+        .catch(() => {
+          setMobileExpanded(true);
+        });
       return;
     }
-    const webkitVideo = video as HTMLVideoElement & {
-      webkitEnterFullscreen?: () => void;
-    };
-    webkitVideo.webkitEnterFullscreen?.();
+
+    // iPhone / iOS Safari não suporta requestFullscreen em container HTML:
+    // usa modo expandido imersivo preservando pinch-zoom, chat e controles Ping.
+    setMobileExpanded(true);
   };
 
   const chatMount = $<HTMLElement>(root, "#chat-mount");
@@ -344,7 +377,7 @@ export function mountViewer(root: HTMLElement, room: string): void {
     },
     onFullscreenToggle: () => {
       toggleFullscreen();
-      showOsd(document.fullscreenElement ? "🔲 Janela normal" : "🔲 Tela cheia");
+      showBarTemporarily();
     },
   });
   pingPlayer.setChatActive(chatUi.isChatOpen());
@@ -1253,14 +1286,21 @@ export function mountViewer(root: HTMLElement, room: string): void {
     discordStatsModal.hidden = true;
   });
 
-  fsBtn.addEventListener("click", () => {
-    toggleFullscreen();
-    showBarTemporarily();
-  });
+  const onFullscreenChange = (): void => {
+    const isFs = Boolean(document.fullscreenElement);
+    fsBtn?.classList.toggle("active", isFs);
+    fsBtn?.setAttribute("aria-pressed", String(isFs));
+    if (!isFs) {
+      unlockOrientation();
+    }
+    showOsd(isFs ? "🔲 Tela cheia" : "🔲 Janela normal");
+  };
+  document.addEventListener("fullscreenchange", onFullscreenChange);
 
   video.addEventListener("dblclick", () => toggleFullscreen());
 
   function onBeforeUnload(): void {
+    document.removeEventListener("fullscreenchange", onFullscreenChange);
     if (finished) return;
     terminate("Conexão encerrada.", false);
     pingPlayer?.dispose();

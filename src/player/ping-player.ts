@@ -8,6 +8,7 @@ import "./components/stats-button";
 import "./components/quality-menu";
 import "./components/fps-menu";
 import "./components/chat-button";
+import "./components/zoom-button";
 import "./components/osd";
 
 import { PingLiveBadge } from "./components/live-badge";
@@ -16,7 +17,9 @@ import { PingStatsButton } from "./components/stats-button";
 import { PingQualityMenu } from "./components/quality-menu";
 import { PingFpsMenu } from "./components/fps-menu";
 import { PingChatButton } from "./components/chat-button";
+import { PingZoomButton } from "./components/zoom-button";
 import { PingOsd } from "./components/osd";
+import { attachMobileZoom, type MobileZoomController } from "./mobile-zoom";
 import type { QualityPreset } from "../protocol";
 
 export interface PingPlayerOptions {
@@ -37,10 +40,12 @@ export class PingPlayer {
   private qualityMenu!: PingQualityMenu;
   private fpsMenu!: PingFpsMenu;
   private theaterBtn!: PingTheaterButton;
+  private zoomBtn!: PingZoomButton;
   public chatBtn!: PingChatButton;
   public statsBtn!: PingStatsButton;
   public liveBadge!: PingLiveBadge;
   private osd!: PingOsd;
+  private mobileZoom: MobileZoomController | null = null;
   private onKeyDownBound: (e: KeyboardEvent) => void;
 
   constructor(targetEl: HTMLVideoElement | HTMLElement, opts: PingPlayerOptions = {}) {
@@ -87,10 +92,10 @@ export class PingPlayer {
       textTrackSettings: false,
     });
 
-    this.setupComponents();
+    this.setupComponents(opts);
     this.setupEvents(opts);
 
-    const wrapper = this.player.el();
+    const wrapper = this.player.el() as HTMLElement | undefined;
     if (wrapper) {
       wrapper.id = "vjs-stage";
     }
@@ -101,11 +106,22 @@ export class PingPlayer {
       this.videoEl = tech as HTMLVideoElement;
     }
 
+    if (wrapper && this.videoEl) {
+      this.mobileZoom = attachMobileZoom(wrapper, this.videoEl, {
+        onStateChange: ({ scale, coverMode }) => {
+          this.zoomBtn?.setZoomState(scale, coverMode);
+        },
+        onNotify: (msg) => {
+          this.showToast(msg, 2200);
+        },
+      });
+    }
+
     this.onKeyDownBound = (e: KeyboardEvent) => this.handleKeyDown(e, opts);
     window.addEventListener("keydown", this.onKeyDownBound, true);
   }
 
-  private setupComponents() {
+  private setupComponents(opts: PingPlayerOptions) {
     const cb = this.player.getChild("controlBar");
     if (cb) {
       const cbEl = cb.el();
@@ -132,6 +148,7 @@ export class PingPlayer {
       this.statsBtn = cb.addChild("PingStatsButton", {}) as unknown as PingStatsButton;
       this.chatBtn = cb.addChild("PingChatButton", {}) as unknown as PingChatButton;
       this.theaterBtn = cb.addChild("PingTheaterButton", {}) as unknown as PingTheaterButton;
+      this.zoomBtn = cb.addChild("PingZoomButton", {}) as unknown as PingZoomButton;
 
       // Adiciona IDs aos botões padrão e posiciona no extremo direito
       const pipComp = cb.getChild("pictureInPictureToggle");
@@ -146,12 +163,18 @@ export class PingPlayer {
         }
       }
 
-      const fsComp = cb.getChild("fullscreenToggle");
+      const fsComp = cb.getChild("fullscreenToggle") as any;
       if (fsComp) {
+        if (opts.onFullscreenToggle) {
+          fsComp.handleClick = (event: Event) => {
+            event.stopPropagation();
+            opts.onFullscreenToggle?.();
+          };
+        }
         const fsEl = fsComp.el();
         if (fsEl) {
           fsEl.id = "fs";
-          fsEl.setAttribute("title", "Alternar tela cheia (F)");
+          fsEl.setAttribute("title", "Alternar tela cheia / expandir (F)");
           cbEl.appendChild(fsEl);
         }
       }
@@ -180,6 +203,10 @@ export class PingPlayer {
 
     this.player.on("theatermodechange", () => {
       opts.onTheaterChange?.();
+    });
+
+    this.player.on("zoomtoggle", () => {
+      this.mobileZoom?.cycleMobileView();
     });
   }
 
@@ -270,6 +297,11 @@ export class PingPlayer {
         opts.onChatToggle?.();
         break;
       }
+      case "z": {
+        e.preventDefault();
+        this.mobileZoom?.cycleMobileView();
+        break;
+      }
     }
   }
 
@@ -333,6 +365,8 @@ export class PingPlayer {
 
   dispose(): void {
     window.removeEventListener("keydown", this.onKeyDownBound, true);
+    this.mobileZoom?.destroy();
+    this.mobileZoom = null;
     try {
       this.player.dispose();
     } catch {
