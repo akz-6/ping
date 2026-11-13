@@ -1089,14 +1089,23 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
 
   // Heartbeat a cada 20s para sustentar a sala ativa no catálogo global (/api/rooms)
   const roomHeartbeatTimer =
-    mountOpts.roomId && typeof fetch !== "undefined"
+    typeof fetch !== "undefined"
       ? window.setInterval(() => {
           const activeId = peer?.id || mountOpts.roomId;
           if (!activeId) return;
+          const token = mountOpts.hostToken || sessionStorage.getItem("ping:host_token:" + activeId) || "host";
           void fetch("/api/rooms", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: activeId, hostToken: mountOpts.hostToken }),
+            body: JSON.stringify({
+              id: activeId,
+              hostToken: token,
+              viewers: viewers.size,
+              capacity: Number(maxViewersInput.value) || 3,
+              isPrivate: Boolean(currentPassword),
+              password: currentPassword || undefined,
+              hidden: isRoomHidden,
+            }),
           }).catch(() => undefined);
         }, 20_000)
       : undefined;
@@ -1447,6 +1456,21 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
       stopStreamBtn.classList.remove("active");
       const token = mountOpts.hostToken || sessionStorage.getItem("ping:host_token:" + openedId) || "host";
       hostLifecycle = startHostLifecycle({ roomId: openedId, hostToken: token });
+      if (typeof fetch !== "undefined") {
+        void fetch("/api/rooms", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: openedId,
+            hostToken: token,
+            viewers: viewers.size,
+            capacity: opts.maxViewers,
+            isPrivate: Boolean(currentPassword),
+            password: currentPassword || undefined,
+            hidden: isRoomHidden,
+          }),
+        }).catch(() => undefined);
+      }
       broadcastCount();
 
       clearStatsInterval();

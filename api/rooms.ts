@@ -189,6 +189,8 @@ export default async function handler(req: any, res: any) {
     if (method === "PATCH") {
       const body = (typeof req.body === "string" ? JSON.parse(req.body) : req.body) as {
         id: string;
+        name?: string;
+        host?: string;
         hostToken?: string;
         viewers?: number;
         capacity?: number;
@@ -201,9 +203,26 @@ export default async function handler(req: any, res: any) {
       }
 
       const rooms = await getStoredRooms();
-      const target = rooms.find((r) => r.id === body.id);
+      let target = rooms.find((r) => r.id === body.id);
       if (!target) {
-        return res.status(404).json({ ok: false });
+        const now = Date.now();
+        const rawPassword = typeof body.password === "string" && body.password.trim() ? body.password.trim() : undefined;
+        target = {
+          id: String(body.id).slice(0, 64),
+          name: String(body.name || "Sala ao Vivo").trim().slice(0, 50) || "Sala ao Vivo",
+          host: String(body.host || "Anfitrião").slice(0, 40),
+          isPrivate: Boolean(body.isPrivate || rawPassword),
+          hidden: Boolean(body.hidden),
+          viewers: typeof body.viewers === "number" && body.viewers >= 0 ? Math.min(body.viewers, 999) : 0,
+          capacity: typeof body.capacity === "number" && body.capacity > 0 ? Math.min(body.capacity, 50) : 3,
+          hostToken: body.hostToken ? String(body.hostToken).slice(0, 128) : undefined,
+          password: rawPassword ? rawPassword.slice(0, 64) : undefined,
+          createdAt: now,
+          updatedAt: now,
+        };
+        rooms.unshift(target);
+        await saveStoredRooms(rooms);
+        return res.status(200).json({ ok: true, room: publicRoom(target) });
       }
 
       target.updatedAt = Date.now();

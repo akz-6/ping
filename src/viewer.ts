@@ -603,6 +603,8 @@ export function mountViewer(root: HTMLElement, room: string): void {
     }, BAR_HIDE_MS);
   };
 
+  let waitingForHostAttempts = 0;
+
   const setStatus = (msg: string, isError = false): void => {
     authWrap.hidden = true;
     statusEl.hidden = false;
@@ -612,13 +614,25 @@ export function mountViewer(root: HTMLElement, room: string): void {
     p.className = "status-text";
     p.textContent = msg;
     statusEl.appendChild(p);
-    if (isError || finished || everConnected) {
-      const backLink = document.createElement("a");
-      backLink.href = "/";
-      backLink.className = "btn-back-lobby";
-      backLink.textContent = "← Voltar ao Lobby";
-      statusEl.appendChild(backLink);
+    if (isError || finished) {
+      const retryBtn = document.createElement("button");
+      retryBtn.type = "button";
+      retryBtn.id = "btn-retry-room";
+      retryBtn.className = "btn-retry-room";
+      retryBtn.textContent = "↻ Tentar novamente";
+      retryBtn.addEventListener("click", () => {
+        finished = false;
+        reconnectAttempt = 0;
+        waitingForHostAttempts = 0;
+        void connectAttempt();
+      });
+      statusEl.appendChild(retryBtn);
     }
+    const backLink = document.createElement("a");
+    backLink.href = "/";
+    backLink.className = "btn-back-lobby";
+    backLink.textContent = "← Voltar ao Lobby";
+    statusEl.appendChild(backLink);
   };
 
   if (!ROOM_PATTERN.test(room)) {
@@ -1197,10 +1211,44 @@ export function mountViewer(root: HTMLElement, room: string): void {
       const type = String(err.type);
       if (type === "peer-unavailable") {
         if (!everConnected) {
-          terminate(
-            "Sala não existe. Confira o link ou peça um novo ao anfitrião.",
-            true,
-          );
+          void (async () => {
+            let roomExistsInCatalog = false;
+            if (typeof fetch !== "undefined") {
+              try {
+                const res = await fetch(`/api/rooms?id=${encodeURIComponent(room)}`, { cache: "no-store" });
+                if (res.ok) {
+                  const data = (await res.json()) as { room?: { id: string } | null };
+                  roomExistsInCatalog = Boolean(data?.room?.id);
+                }
+              } catch {
+                // ignore network error
+              }
+            }
+            if (finished) return;
+            if (roomExistsInCatalog && waitingForHostAttempts < 40) {
+              waitingForHostAttempts += 1;
+              cleanupCurrentAttempt();
+              gotStream = false;
+              setStatus(
+                "Sala encontrada! Aguardando o anfitrião iniciar a transmissão de tela…",
+                false,
+              );
+              mobileDock?.setStreamState("connecting", "Aguardando anfitrião");
+              backoffTimer = window.setTimeout(() => {
+                backoffTimer = undefined;
+                if (!finished) void connectAttempt();
+              }, 3_000);
+              return;
+            }
+            if (reconnectAttempt < 2) {
+              scheduleReconnect("peer-unavailable");
+              return;
+            }
+            terminate(
+              "Sala não existe ou o anfitrião encerrou a transmissão. Confira o link ou tente novamente.",
+              true,
+            );
+          })();
         } else {
           scheduleReconnect("peer-unavailable");
         }
