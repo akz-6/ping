@@ -10,7 +10,8 @@
 .mobile-actions-bar,
 .mobile-sheet-backdrop,
 .mobile-sheet,
-.mobile-buffering-pill {
+.mobile-buffering-pill,
+.vjs-rotate-control {
   display: none;
 }
 
@@ -190,7 +191,8 @@
     min-height: 38px;
   }
 
-  /* Oculta botões secundários/desktop da barra sobreposta ao vídeo (vivem nas seções dedicadas abaixo) */
+  /* Oculta botões secundários/desktop e links duplicados da barra sobreposta ao vídeo */
+  .viewer .video-js.ping-skin .vjs-control-bar .btn-leave-room,
   .viewer .video-js.ping-skin .vjs-control-bar .vjs-theater-control,
   .viewer .video-js.ping-skin .vjs-control-bar .vjs-fps-control,
   .viewer .video-js.ping-skin .vjs-control-bar .vjs-quality-control,
@@ -203,12 +205,13 @@
     display: none !important;
   }
 
-  .viewer .video-js.ping-skin .vjs-control-bar .vjs-zoom-control {
+  .viewer .video-js.ping-skin .vjs-control-bar .vjs-zoom-control,
+  .viewer .video-js.ping-skin .vjs-control-bar .vjs-rotate-control {
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    padding: 0 10px;
-    font-size: 12px;
+    padding: 0 7px;
+    font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
   }
@@ -369,8 +372,8 @@
 
   .mobile-secondary-actions {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--space-2);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
     width: 100%;
   }
 
@@ -400,6 +403,12 @@
     border-color: var(--accent);
     color: var(--text);
     background: var(--red-soft);
+  }
+
+  @media (max-width: 390px) {
+    .mobile-secondary-actions {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   @media (max-width: 359px) {
@@ -659,6 +668,41 @@
     flex: 1;
     max-height: none;
     height: 100%;
+    aspect-ratio: auto;
+  }
+
+  /* 8b. Rotação horizontal manual (fallback quando orientation.lock não é suportado, ex: iPhone/WebView) */
+  .viewer.mobile-landscape-rotated {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 100dvh;
+    height: 100vw;
+    max-width: none;
+    max-height: none;
+    min-height: 0;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+    z-index: 9999;
+    background: var(--bg-stage);
+  }
+  .viewer.mobile-landscape-rotated .viewer-header,
+  .viewer.mobile-landscape-rotated .mobile-stream-info,
+  .viewer.mobile-landscape-rotated .mobile-actions-bar,
+  .viewer.mobile-landscape-rotated .chat-panel {
+    display: none !important;
+  }
+  .viewer.mobile-landscape-rotated > .palco-layout {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  .viewer.mobile-landscape-rotated .palco-stage {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    max-height: none;
     aspect-ratio: auto;
   }
 

@@ -26,6 +26,7 @@ export interface MobileDockOptions {
   onOpenQuality: () => void;
   onOpenStats: () => void;
   onToggleFit: () => void;
+  onToggleRotate: () => void;
 }
 
 const PRESET_SHORT: Record<QualityPreset, string> = {
@@ -68,6 +69,8 @@ export class MobileDock {
   private statsBtn: HTMLButtonElement;
   private fitBtn: HTMLButtonElement;
   private fitLabel: HTMLElement;
+  private rotateBtn: HTMLButtonElement;
+  private rotateLabel: HTMLElement;
   private shareBtn: HTMLButtonElement;
   private shareLabel: HTMLElement;
 
@@ -239,6 +242,12 @@ export class MobileDock {
     this.fitBtn.setAttribute("aria-label", "Ajustar ou preencher tela do vídeo");
     this.fitBtn.addEventListener("click", () => this.opts.onToggleFit());
 
+    this.rotateBtn = this.makeSecondaryBtn("mobile-rotate-btn", "refresh-cw", "Deitar");
+    this.rotateLabel = this.rotateBtn.querySelector("span")!;
+    this.rotateBtn.setAttribute("aria-label", "Deitar tela para assistir na horizontal");
+    this.rotateBtn.setAttribute("aria-pressed", "false");
+    this.rotateBtn.addEventListener("click", () => this.opts.onToggleRotate());
+
     this.shareBtn = this.makeSecondaryBtn("mobile-share-btn", "share-2", "Compartilhar");
     this.shareLabel = this.shareBtn.querySelector("span")!;
     this.shareBtn.setAttribute("aria-label", "Compartilhar ou copiar link da sala");
@@ -249,6 +258,7 @@ export class MobileDock {
     secondaryRow.appendChild(this.qualityBtn);
     secondaryRow.appendChild(this.statsBtn);
     secondaryRow.appendChild(this.fitBtn);
+    secondaryRow.appendChild(this.rotateBtn);
     secondaryRow.appendChild(this.shareBtn);
 
     this.actionsWrapEl.appendChild(primaryRow);
@@ -303,7 +313,7 @@ export class MobileDock {
 
   private makeSecondaryBtn(
     id: string,
-    icon: "sliders" | "bar-chart-2" | "expand" | "share-2",
+    icon: "sliders" | "bar-chart-2" | "expand" | "refresh-cw" | "share-2",
     label: string,
   ): HTMLButtonElement {
     const btn = document.createElement("button");
@@ -442,6 +452,12 @@ export class MobileDock {
   syncFit(isCover: boolean): void {
     this.fitBtn.classList.toggle("is-active", isCover);
     this.fitLabel.textContent = isCover ? "Original" : "Preencher";
+  }
+
+  syncRotate(isRotated: boolean): void {
+    this.rotateBtn.classList.toggle("is-active", isRotated);
+    this.rotateBtn.setAttribute("aria-pressed", String(isRotated));
+    this.rotateLabel.textContent = isRotated ? "Normal" : "Deitar";
   }
 
   destroy(): void {

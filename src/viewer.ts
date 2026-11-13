@@ -310,7 +310,58 @@ export function mountViewer(root: HTMLElement, room: string): void {
     }
   };
 
+  let isLandscapeRotated = false;
+
+  const setRotateUiState = (rotated: boolean): void => {
+    isLandscapeRotated = rotated;
+    pingPlayer?.setRotateState(rotated);
+    mobileDock?.syncRotate(rotated);
+  };
+
+  const toggleLandscapeRotate = async (): Promise<void> => {
+    if (isLandscapeRotated || container.classList.contains("mobile-landscape-rotated")) {
+      container.classList.remove("mobile-landscape-rotated");
+      setRotateUiState(false);
+      unlockOrientation();
+      if (document.fullscreenElement) {
+        await document.exitFullscreen().catch(() => undefined);
+      }
+      showOsd("📱 Orientação normal");
+      return;
+    }
+
+    container.classList.remove("mobile-expanded");
+    container.dataset.expanded = "false";
+
+    // Tenta Fullscreen + orientation.lock("landscape") nativo (funciona no Android Chrome mesmo com rotação automática desligada)
+    if (typeof container.requestFullscreen === "function" && document.fullscreenEnabled !== false) {
+      try {
+        if (!document.fullscreenElement) {
+          await container.requestFullscreen();
+        }
+        const orient = screen.orientation as { lock?: (o: string) => Promise<void> } | undefined;
+        if (orient && typeof orient.lock === "function") {
+          await orient.lock("landscape");
+          setRotateUiState(true);
+          showOsd("📱 Tela deitada");
+          return;
+        }
+      } catch {
+        // Fallback CSS abaixo para iPhone / WebView / navegadores sem suporte a orientation.lock
+      }
+    }
+
+    container.classList.add("mobile-landscape-rotated");
+    setRotateUiState(true);
+    showOsd("📱 Tela deitada");
+  };
+
   const toggleFullscreen = (): void => {
+    if (container.classList.contains("mobile-landscape-rotated")) {
+      container.classList.remove("mobile-landscape-rotated");
+      setRotateUiState(false);
+    }
+
     if (container.classList.contains("mobile-expanded")) {
       setMobileExpanded(false);
       unlockOrientation();
@@ -323,17 +374,12 @@ export function mountViewer(root: HTMLElement, room: string): void {
       return;
     }
 
-    const isTouch =
-      window.matchMedia?.("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
+    // Respeita a rotação automática do celular (sem forçar lock ao entrar em tela cheia normal)
     if (typeof container.requestFullscreen === "function" && document.fullscreenEnabled !== false) {
       void container
         .requestFullscreen()
         .then(() => {
-          if (isTouch) {
-            void (
-              screen.orientation as { lock?: (o: string) => Promise<void> } | undefined
-            )?.lock?.("landscape").catch(() => undefined);
-          }
+          unlockOrientation();
         })
         .catch(() => {
           setMobileExpanded(true);
@@ -396,6 +442,10 @@ export function mountViewer(root: HTMLElement, room: string): void {
       toggleFullscreen();
       showBarTemporarily();
     },
+    onRotateToggle: () => {
+      void toggleLandscapeRotate();
+      showBarTemporarily();
+    },
   });
   pingPlayer.setChatActive(chatUi.isChatOpen());
 
@@ -432,6 +482,10 @@ export function mountViewer(root: HTMLElement, room: string): void {
       zBtn?.click();
       const playerWrap = root.querySelector(".video-js.ping-skin");
       mobileDock.syncFit(Boolean(playerWrap?.classList.contains("is-cover-mode")));
+    },
+    onToggleRotate: () => {
+      void toggleLandscapeRotate();
+      showBarTemporarily();
     },
   });
   mobileDock.syncChat(chatUi.isChatOpen(), currentUnreadCount);
@@ -1369,15 +1423,30 @@ export function mountViewer(root: HTMLElement, room: string): void {
     mobileDock?.syncFullscreen(isFs);
     if (!isFs) {
       unlockOrientation();
+      if (isLandscapeRotated && !container.classList.contains("mobile-landscape-rotated")) {
+        setRotateUiState(false);
+      }
     }
     showOsd(isFs ? "🔲 Tela cheia" : "🔲 Janela normal");
   };
   document.addEventListener("fullscreenchange", onFullscreenChange);
 
+  const onOrientationChange = (): void => {
+    // Se o usuário virou o celular fisicamente para horizontal (rotação automática ligada),
+    // remove a rotação CSS manual para não girar duas vezes.
+    const isNowLandscape = window.matchMedia?.("(orientation: landscape)").matches;
+    if (isNowLandscape && container.classList.contains("mobile-landscape-rotated")) {
+      container.classList.remove("mobile-landscape-rotated");
+      setRotateUiState(false);
+    }
+  };
+  window.addEventListener("orientationchange", onOrientationChange);
+
   video.addEventListener("dblclick", () => toggleFullscreen());
 
   function onBeforeUnload(): void {
     document.removeEventListener("fullscreenchange", onFullscreenChange);
+    window.removeEventListener("orientationchange", onOrientationChange);
     mobileDock?.destroy();
     mobileSheets?.destroy();
     if (finished) return;

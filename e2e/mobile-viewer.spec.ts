@@ -89,9 +89,20 @@ test.describe("Mobile Viewer — Reconstrução Mobile Completa", () => {
     await expect(page.locator(".video-js.ping-skin")).toHaveClass(/is-cover-mode/);
     await zoomBtn.click();
 
+    // Botão Deitar tela no player (#rotate-btn) e fallback CSS 90deg quando orientation.lock não é suportado
+    const rotateBtn = page.locator("#rotate-btn");
+    await bar.evaluate((el) => { (el as HTMLElement).hidden = false; });
+    await expect(rotateBtn).toBeVisible();
+    await rotateBtn.click();
+    const viewer = page.locator(".viewer");
+    await expect(viewer).toHaveClass(/mobile-landscape-rotated/);
+    await expect(rotateBtn).toContainText("Normal");
+    await bar.evaluate((el) => { (el as HTMLElement).hidden = false; });
+    await rotateBtn.click({ force: true });
+    await expect(viewer).not.toHaveClass(/mobile-landscape-rotated/);
+
     // Fullscreen fallback no iPhone (.mobile-expanded)
     await fsPrimaryBtn.click();
-    const viewer = page.locator(".viewer");
     await expect(viewer).toHaveClass(/mobile-expanded/);
     await expect(page.locator(".viewer-header")).toBeHidden();
     await page.locator("#fs").click();
@@ -118,7 +129,7 @@ test.describe("Mobile Viewer — Reconstrução Mobile Completa", () => {
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(overflow).toBeLessThanOrEqual(0);
 
-      for (const sel of ["#mobile-audio-btn", "#mobile-chat-btn", "#mobile-fs-btn", "#mobile-quality-btn", "#mobile-stats-btn", "#mobile-fit-btn", "#mobile-share-btn", "#zoom-btn", "#fs"]) {
+      for (const sel of ["#mobile-audio-btn", "#mobile-chat-btn", "#mobile-fs-btn", "#mobile-quality-btn", "#mobile-stats-btn", "#mobile-fit-btn", "#mobile-rotate-btn", "#mobile-share-btn", "#zoom-btn", "#rotate-btn", "#fs"]) {
         const el = page.locator(sel);
         await expect(el).toBeVisible();
         const box = await el.boundingBox();

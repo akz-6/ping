@@ -9,6 +9,7 @@ import "./components/quality-menu";
 import "./components/fps-menu";
 import "./components/chat-button";
 import "./components/zoom-button";
+import "./components/rotate-button";
 import "./components/osd";
 
 import { PingLiveBadge } from "./components/live-badge";
@@ -18,6 +19,7 @@ import { PingQualityMenu } from "./components/quality-menu";
 import { PingFpsMenu } from "./components/fps-menu";
 import { PingChatButton } from "./components/chat-button";
 import { PingZoomButton } from "./components/zoom-button";
+import { PingRotateButton } from "./components/rotate-button";
 import { PingOsd } from "./components/osd";
 import { attachMobileZoom, type MobileZoomController } from "./mobile-zoom";
 import type { QualityPreset } from "../protocol";
@@ -32,6 +34,7 @@ export interface PingPlayerOptions {
   onTheaterChange?: () => void;
   onMuteToggle?: () => void;
   onFullscreenToggle?: () => void;
+  onRotateToggle?: () => void;
 }
 
 export class PingPlayer {
@@ -41,6 +44,7 @@ export class PingPlayer {
   private fpsMenu!: PingFpsMenu;
   private theaterBtn!: PingTheaterButton;
   private zoomBtn!: PingZoomButton;
+  private rotateBtn!: PingRotateButton;
   public chatBtn!: PingChatButton;
   public statsBtn!: PingStatsButton;
   public liveBadge!: PingLiveBadge;
@@ -149,6 +153,7 @@ export class PingPlayer {
       this.chatBtn = cb.addChild("PingChatButton", {}) as unknown as PingChatButton;
       this.theaterBtn = cb.addChild("PingTheaterButton", {}) as unknown as PingTheaterButton;
       this.zoomBtn = cb.addChild("PingZoomButton", {}) as unknown as PingZoomButton;
+      this.rotateBtn = cb.addChild("PingRotateButton", {}) as unknown as PingRotateButton;
 
       // Adiciona IDs aos botões padrão e posiciona no extremo direito
       const pipComp = cb.getChild("pictureInPictureToggle");
@@ -207,6 +212,10 @@ export class PingPlayer {
 
     this.player.on("zoomtoggle", () => {
       this.mobileZoom?.cycleMobileView();
+    });
+
+    this.player.on("rotatetoggle", () => {
+      opts.onRotateToggle?.();
     });
   }
 
@@ -322,6 +331,10 @@ export class PingPlayer {
 
   setQuality(preset: QualityPreset): void {
     this.qualityMenu?.setPreset(preset);
+  }
+
+  setRotateState(rotated: boolean): void {
+    this.rotateBtn?.setRotated(rotated);
   }
 
   setFps(fps: "auto" | number): void {
