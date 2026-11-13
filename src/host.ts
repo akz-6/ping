@@ -1087,7 +1087,24 @@ export function mountHost(root: HTMLElement, mountOpts: { password?: string; roo
     };
   };
 
+  // Heartbeat a cada 20s para sustentar a sala ativa no catálogo global (/api/rooms)
+  const roomHeartbeatTimer =
+    mountOpts.roomId && typeof fetch !== "undefined"
+      ? window.setInterval(() => {
+          const activeId = peer?.id || mountOpts.roomId;
+          if (!activeId) return;
+          void fetch("/api/rooms", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: activeId, hostToken: mountOpts.hostToken }),
+          }).catch(() => undefined);
+        }, 20_000)
+      : undefined;
+
   const stop = (): void => {
+    if (roomHeartbeatTimer !== undefined) {
+      window.clearInterval(roomHeartbeatTimer);
+    }
     const roomIdToClose = peer?.id || mountOpts.roomId;
     if (roomIdToClose) {
       if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {

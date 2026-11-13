@@ -1,4 +1,4 @@
-import { put, list } from "@vercel/blob";
+import { Redis } from "@upstash/redis";
 import {
   getSessionSecret,
   verifyPayload,
@@ -21,46 +21,45 @@ export interface StoredRoom {
   updatedAt: number;
 }
 
-const BLOB_FILENAME = "rooms-catalog.json";
-const MAX_STALE_MS = 30 * 60 * 1000; // 60 segundos sem heartbeat considera inativa
+const ROOMS_REDIS_KEY = "ping:rooms_catalog_v1";
+const MAX_STALE_MS = 30 * 60 * 1000; // 30 minutos sem heartbeat considera inativa
 const MAX_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 horas máximo de vida útil da sala
 const OWNER_KEY = (process.env.OWNER_KEY || "0604").trim();
 
-let memoryRooms: StoredRoom[] | null = null;
-let lastMemoryUpdate = 0;
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+const redis = redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null;
+
+let memoryRooms: StoredRoom[] = [];
+
+function filterActiveRooms(rooms: StoredRoom[], now = Date.now()): StoredRoom[] {
+  return rooms.filter(
+    (r) => now - r.updatedAt < MAX_STALE_MS && now - r.createdAt < MAX_LIFETIME_MS,
+  );
+}
 
 async function getStoredRooms(): Promise<StoredRoom[]> {
   const now = Date.now();
-  if (memoryRooms && now - lastMemoryUpdate < 2000) {
-    return memoryRooms.filter((r) => now - r.updatedAt < MAX_STALE_MS && now - r.createdAt < MAX_LIFETIME_MS);
+  if (!redis) {
+    return filterActiveRooms(memoryRooms, now);
   }
 
   try {
-    const { blobs } = await list({ prefix: BLOB_FILENAME });
-    if (!blobs || blobs.length === 0) return memoryRooms || [];
-    const target = blobs.find((b) => b.pathname === BLOB_FILENAME) ?? blobs[0];
-    const fetchUrl = `${target.url}?t=${Date.now()}`;
-    const res = await fetch(fetchUrl, { cache: "no-store" });
-    if (!res.ok) return memoryRooms || [];
-    const stored = (await res.json()) as StoredRoom[];
-    memoryRooms = stored;
-    lastMemoryUpdate = Date.now();
-    return stored.filter((r) => now - r.updatedAt < MAX_STALE_MS && now - r.createdAt < MAX_LIFETIME_MS);
+    const stored = await redis.get<StoredRoom[]>(ROOMS_REDIS_KEY);
+    const list = Array.isArray(stored) ? stored : [];
+    memoryRooms = list;
+    return filterActiveRooms(list, now);
   } catch (err) {
-    console.error("Erro ao obter salas do Blob:", err);
-    return memoryRooms || [];
+    console.error("Erro ao obter salas do Redis:", err);
+    return filterActiveRooms(memoryRooms, now);
   }
 }
 
 async function saveStoredRooms(rooms: StoredRoom[]): Promise<void> {
-  const clean = rooms.slice(-20);
+  const clean = filterActiveRooms(rooms).slice(-30);
   memoryRooms = clean;
-  lastMemoryUpdate = Date.now();
-  await put(BLOB_FILENAME, JSON.stringify(clean), {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  if (!redis) return;
+  await redis.set(ROOMS_REDIS_KEY, clean, { ex: 4 * 60 * 60 });
 }
 
 function publicRoom(r: StoredRoom) {
@@ -71,7 +70,7 @@ function publicRoom(r: StoredRoom) {
     isPrivate: r.isPrivate,
     hidden: Boolean(r.hidden),
     viewers: r.viewers ?? 0,
-    capacity: r.capacity ?? 2,
+    capacity: r.capacity ?? 3,
     hostToken: r.hostToken,
   };
 }
@@ -162,7 +161,6 @@ export default async function handler(req: any, res: any) {
         isDiscordOwner ||
         ((body as any).creatorKey && (body as any).creatorKey === OWNER_KEY);
 
-      // Limite de 2 salas abertas no catálogo global (exceto se criado pelo dono com master key)
       if (!body.isPrivate && !body.hidden && !isOwner && openCount >= 10) {
         return res.status(403).json({ error: "LIMITE_SALAS_ABERTAS" });
       }
@@ -175,7 +173,7 @@ export default async function handler(req: any, res: any) {
         isPrivate: Boolean(body.isPrivate),
         hidden: Boolean(body.hidden),
         viewers: 0,
-        capacity: 2,
+        capacity: typeof body.capacity === "number" && body.capacity > 0 ? body.capacity : 3,
         hostToken: body.hostToken,
         password: body.password,
         createdAt: now,
@@ -193,6 +191,7 @@ export default async function handler(req: any, res: any) {
         id: string;
         hostToken?: string;
         viewers?: number;
+        capacity?: number;
         password?: string | null;
         isPrivate?: boolean;
         hidden?: boolean;
@@ -208,6 +207,9 @@ export default async function handler(req: any, res: any) {
       }
 
       target.updatedAt = Date.now();
+      if (typeof body.capacity === "number" && body.capacity > 0) {
+        target.capacity = body.capacity;
+      }
       if (typeof body.viewers === "number") {
         target.viewers = Math.min(Math.max(0, body.viewers), target.capacity);
       }

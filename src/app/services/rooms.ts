@@ -352,32 +352,36 @@ export class MockRoomService implements RoomService {
 
       // Sincroniza com a nuvem (/api/rooms) para que outros usuários e amigos vejam a sala
       if (typeof fetch !== "undefined") {
-        void fetch("/api/rooms", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: room.id,
-            name: room.name,
-            host: room.host,
-            isPrivate: room.isPrivate,
-            hidden: room.hidden,
-            hostToken: room.hostToken,
-            password: input.password,
-            isOwner: input.isOwner,
-          }),
-        })
-          .then(async (res) => {
-            if (!res.ok && res.status === 403) {
-              // Se o limite da nuvem foi atingido, remove localmente
-              this.rooms = this.rooms.filter((r) => r.id !== room.id);
-              if (typeof localStorage !== "undefined") {
-                const local = getLocalActiveRooms().filter((r) => r.id !== room.id);
-                saveLocalActiveRooms(local);
-              }
-              this.emit();
+        try {
+          const res = await fetch("/api/rooms", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+            body: JSON.stringify({
+              id: room.id,
+              name: room.name,
+              host: room.host,
+              isPrivate: room.isPrivate,
+              hidden: room.hidden,
+              hostToken: room.hostToken,
+              password: input.password,
+              isOwner: input.isOwner,
+            }),
+          });
+          if (!res.ok && res.status === 403) {
+            // Se o limite da nuvem foi atingido, remove localmente e propaga erro
+            this.rooms = this.rooms.filter((r) => r.id !== room.id);
+            if (typeof localStorage !== "undefined") {
+              const local = getLocalActiveRooms().filter((r) => r.id !== room.id);
+              saveLocalActiveRooms(local);
             }
-          })
-          .catch(() => undefined);
+            this.emit();
+            throw new RoomLimitError();
+          }
+        } catch (err) {
+          if (err instanceof RoomLimitError) throw err;
+          // Mantém fallback local caso esteja offline/testando localmente
+        }
       }
 
       return room;

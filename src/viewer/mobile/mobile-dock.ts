@@ -331,10 +331,11 @@ export class MobileDock {
     try {
       const res = await fetch("/api/rooms", { cache: "no-store" });
       if (!res.ok || this.destroyed) return;
-      const data = (await res.json()) as {
-        rooms?: Array<{ id: string; name?: string; host?: string; viewers?: number }>;
-      };
-      const found = data.rooms?.find((r) => r.id === this.opts.room);
+      const data = (await res.json()) as
+        | Array<{ id: string; name?: string; host?: string; viewers?: number }>
+        | { rooms?: Array<{ id: string; name?: string; host?: string; viewers?: number }> };
+      const list = Array.isArray(data) ? data : data.rooms;
+      const found = list?.find((r) => r.id === this.opts.room);
       if (!found || this.destroyed) return;
       if (found.name) {
         this.roomNameEl.textContent = found.name;
